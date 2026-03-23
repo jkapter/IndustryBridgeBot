@@ -15,12 +15,8 @@ namespace Ui {
 class OpcBrowseWidget;
 }
 
-namespace OPC_HELPER {
-class OPCDataManager;
-enum class TAG_STATUS;
-}
-
-
+class DataTagRegistry;
+class SourceDriverManager;
 class OPCTagsViewerModel;
 class QTreeWidgetItem;
 class QMutex;
@@ -33,7 +29,7 @@ class OpcBrowseWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit OpcBrowseWidget(OPC_HELPER::OPCDataManager* dm_ptr, QWidget *parent = nullptr);
+    explicit OpcBrowseWidget(SourceDriverManager* driver_manager, QWidget *parent = nullptr);
     virtual ~OpcBrowseWidget();
 
     void resizeEvent(QResizeEvent* event) override;
@@ -58,17 +54,14 @@ private slots:
 private:
     Ui::OpcBrowseWidget *ui;
     PlainTextConsole* console_;
-    OPC_HELPER::OPCDataManager* opc_data_manager_;
+    SourceDriverManager* driver_manager_;
     std::unordered_set<QString> host_names_;
     std::unordered_map<const QString*, std::set<QString>> host_to_opc_servers_;
     std::unordered_map<const QString*, std::vector<QString>> opc_server_to_tags_list_buffer_;
-    std::unordered_map<const QString*, QMutex> opc_server_to_mutex_;
     std::unordered_map<const QString*, QTreeWidgetItem*> opc_server_to_tree_item_;
     std::unordered_map<const QString*, OPCTagsViewerModel*> opc_server_to_table_model_;
 
     QTreeWidgetItem* selected_item_opc_tree_ = nullptr;
-
-    int opc_threads_count_ = 0;
 
     void opctable_set_column_widths_();
     void opc_tree_set_column_width();
@@ -77,15 +70,15 @@ private:
 };
 
 
-class OPCCheckBoxTableItem: public QWidget
+/*class OPCCheckBoxTableItem: public QWidget
 {
     Q_OBJECT
 public:
-    explicit OPCCheckBoxTableItem(QString tag, OPC_HELPER::TAG_STATUS type, bool checked, QWidget *parent = nullptr);
+    explicit OPCCheckBoxTableItem(QString tag, bool checked, QWidget *parent = nullptr);
     void SetCheckBoxState(bool state);
 
 signals:
-    void sg_change_state(QString tag, OPC_HELPER::TAG_STATUS place, int state);
+    void sg_change_state(QString tag, int state);
 
 private slots:
     void sl_checkbox_changed_state(int state);
@@ -94,7 +87,7 @@ private:
     QString tag_name_;
     OPC_HELPER::TAG_STATUS tag_place_;
     QCheckBox* chb_;
-};
+};*/
 
 class OPCAddHostDialog: public QDialog {
     Q_OBJECT
@@ -117,7 +110,7 @@ class OPCTagsViewerModel: public QAbstractTableModel
     Q_OBJECT
 public:
     OPCTagsViewerModel() = delete;
-    explicit OPCTagsViewerModel(const std::vector<QString>& tags, const QString& tag_prefix, OPC_HELPER::OPCDataManager& opc_manager, QObject* parent = nullptr);
+    explicit OPCTagsViewerModel(const std::vector<QString>& tags, const QString& tag_prefix, DataTagRegistry* data_manager, QObject* parent = nullptr);
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;
@@ -127,7 +120,7 @@ public:
     void reset();
 
 private:
-    OPC_HELPER::OPCDataManager& opc_manager_;
+    DataTagRegistry* data_manager_;
     const std::vector<QString>& tags_;
     QString tag_prefix_;
 };

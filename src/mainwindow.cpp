@@ -13,7 +13,8 @@
 #include <QPropertyAnimation>
 
 #include "copcclient.h"
-#include "opcdatamanager.h"
+//#include "opcdatamanager.h"
+#include "sourcedrivermanager.h"
 #include "tgbotmanager.h"
 #include "opcbrowsewidget.h"
 #include "tgbotsettingswidget.h"
@@ -32,16 +33,16 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-MainWindow::MainWindow(TgBotManager* bot_manager, OPC_HELPER::OPCDataManager* opc_data_manager, QWidget* parent)
+MainWindow::MainWindow(TgBotManager* bot_manager, SourceDriverManager* driver_manager, QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , tg_bot_manager_(bot_manager)
-    , opc_data_manager_(opc_data_manager)
+    , source_data_manager_(driver_manager)
 {
-    if(!tg_bot_manager_ || !opc_data_manager_) {
+    if(!tg_bot_manager_ || !source_data_manager_) {
         qCritical() << QString("Исключение при инициализации приложения: TgBotManager=%1, OPCDataManager=%2")
                            .arg(tg_bot_manager_ ? QString("ОК") : QString("NULL"))
-                           .arg(opc_data_manager_ ? QString("ОК") : QString("NULL"));
+                           .arg(source_data_manager_ ? QString("ОК") : QString("NULL"));
         throw std::logic_error("uninitialized managers");
     }
 
@@ -55,39 +56,41 @@ MainWindow::MainWindow(TgBotManager* bot_manager, OPC_HELPER::OPCDataManager* op
         qWarning() << QString("Не удается открыть файл стилей.");
     }
 
-    status_bar_opc_label_ = new QLabel(u"OPC клиент остановлен"_s, this);
+    status_bar_opc_da_label_ = new QLabel(u"OPC DA клиент остановлен"_s, this);
+    status_bar_opc_ua_label_ = new QLabel(u"OPC UA клиент остановлен"_s, this);
     status_bar_bot_label_ = new QLabel(this);
     status_bar_message_label_ = new QLabel(this);
 
-    ui->statusbar->addPermanentWidget(status_bar_opc_label_, 1);
+    ui->statusbar->addPermanentWidget(status_bar_opc_da_label_, 1);
+    ui->statusbar->addPermanentWidget(status_bar_opc_ua_label_, 1);
     ui->statusbar->addPermanentWidget(status_bar_bot_label_, 1);
-    ui->statusbar->addPermanentWidget(status_bar_message_label_, 4);
+    ui->statusbar->addPermanentWidget(status_bar_message_label_, 3);
 
     setTrayIconActions();
     showTrayIcon();
 
     read_settings_();
 
-    QObject::connect(opc_data_manager_, SIGNAL(sg_set_text_state(QString)), this, SLOT(sl_status_bar_opc_label_change_text(QString)));
+    QObject::connect(source_data_manager_, &SourceDriverManager::sg_data_driver_status_changed, this, &MainWindow::sl_status_bar_opc_label_change_text);
 
     qInfo() << QString("Инициализация Телеграмм Бота");
 
-    QObject::connect(tg_bot_manager_, SIGNAL(sg_bot_thread_state_changed()), this, SLOT(sl_status_bar_bot_label_change_text()));
-    QObject::connect(tg_bot_manager_, SIGNAL(sg_restart_application_cmd(bool)), this, SLOT(sl_restart_app_cmd(bool)), Qt::QueuedConnection);
+    QObject::connect(tg_bot_manager_, &TgBotManager::sg_bot_thread_state_changed, this, &MainWindow::sl_status_bar_bot_label_change_text);
+    QObject::connect(tg_bot_manager_, &TgBotManager::sg_restart_application_cmd, this, &MainWindow::sl_restart_app_cmd, Qt::QueuedConnection);
 
-    opc_data_manager_->SetPeriodReading(opc_period_reading_);
+    source_data_manager_->SetPeriodReading(opc_period_reading_);
 
     if(opc_was_running_) {
-        opc_data_manager_->StartPeriodReading();
+        source_data_manager_->StartPeriodReading();
     }
 
     tg_bot_manager_->SetAutoRestartBot(tg_bot_auto_restart_);
     qInfo() << QString("Установлен автоматический рестарт телеграмм бота: %1").arg(tg_bot_auto_restart_ ? "ДА" : "НЕТ");
 
-    OpcBrowseWidget* opc_browse_wdg = new OpcBrowseWidget(&(*opc_data_manager_), this);
+    OpcBrowseWidget* opc_browse_wdg = new OpcBrowseWidget(source_data_manager_, this);
     ui->swAppPages->addWidget(opc_browse_wdg);
 
-    OPCValuesViewer* opc_viewer_wdg = new OPCValuesViewer(&(*opc_data_manager_), this);
+    OPCValuesViewer* opc_viewer_wdg = new OPCValuesViewer(source_data_manager_, this);
     ui->swAppPages->addWidget(opc_viewer_wdg);
 
     TgBotSettingsWidget* tg_settings_wdg = new TgBotSettingsWidget(&(*tg_bot_manager_), this);
@@ -114,10 +117,15 @@ MainWindow::MainWindow(TgBotManager* bot_manager, OPC_HELPER::OPCDataManager* op
     QObject::connect(ui->pbSaveDataFiles, SIGNAL(clicked()), this, SLOT(sl_pb_savedatafiles_clicked()));
     QObject::connect(ui->pbTgSettingsPage, SIGNAL(clicked()), this, SLOT(sl_pb_tgsettings_page_clicked()));
 
-    if(opc_data_manager_->PeriodicReadingOn()) {
-        status_bar_opc_label_->setText("ОРС в работе");
+    if(source_data_manager_->OpcDaDriver()->PeriodicReadingOn()) {
+        status_bar_opc_da_label_->setText("ОРС DA клиент в работе");
     } else {
-        status_bar_opc_label_->setText("ОРС остановлен");
+        status_bar_opc_da_label_->setText("ОРС DA клиент остановлен");
+    }
+    if(source_data_manager_->OpcUaDriver()->PeriodicReadingOn()) {
+        status_bar_opc_ua_label_->setText("ОРС UA клиент в работе");
+    } else {
+        status_bar_opc_ua_label_->setText("ОРС UA клиент остановлен");
     }
     status_bar_bot_label_->setText("Бот остановлен");
 
@@ -289,8 +297,8 @@ bool MainWindow::write_settings_to_file_(const QString& folder_path) const {
     temp_obj.insert("window_w", this->width());
     temp_obj.insert("window_left", this->geometry().left());
     temp_obj.insert("window_top", this->geometry().top());
-    temp_obj.insert("opc_running", opc_data_manager_->PeriodicReadingOn());
-    temp_obj.insert("opc_period_reading", opc_data_manager_->GetPeriodReading());
+    temp_obj.insert("opc_running", source_data_manager_->OpcDaDriver()->PeriodicReadingOn() || source_data_manager_->OpcUaDriver()->PeriodicReadingOn());
+    temp_obj.insert("opc_period_reading", source_data_manager_->GetPeriodReading());
     temp_obj.insert("auto_restart_bot", tg_bot_manager_->IsAutoRestart());
     temp_obj.insert("auto_restart_application", app_auto_restart_);
     temp_obj.insert("start_application_on_tray", start_app_on_tray_);
@@ -403,8 +411,19 @@ bool MainWindow::read_settings_() {
     return true;
 }
 
-void MainWindow::sl_status_bar_opc_label_change_text(QString text) {
-    status_bar_opc_label_->setText(text);
+void MainWindow::sl_status_bar_opc_label_change_text(DataTag::DataSource driver, bool is_connected) {
+    switch (driver) {
+        using enum DataTag::DataSource;
+    case OPCDA: {
+                status_bar_opc_da_label_->setText(is_connected ? u"OPC DA клиент в работе"_s : u"OPC DA клиент остановлен"_s);
+                break;
+                }
+    case OPCUA: {
+                status_bar_opc_ua_label_->setText(is_connected ? u"OPC UA клиент в работе"_s : u"OPC UA клиент остановлен"_s);
+                break;
+                }
+    default: return;
+    }
 }
 
 void MainWindow::sl_status_bar_bot_label_change_text() {
@@ -463,7 +482,7 @@ void MainWindow::sl_pb_savedatafiles_clicked()
         msgbox.exec();
     }
 
-    message = opc_data_manager_->SaveDataToFile() ? QString("Конфигурация OPC сохранена в папке %1").arg(folder_path)
+    message = source_data_manager_->TagRegistry()->SaveDataToFile(folder_path) ? QString("Конфигурация OPC сохранена в папке %1").arg(folder_path)
                                                            : QString("Не удалось сохранить конфигурацию OPC.");
 
     qInfo() << message;

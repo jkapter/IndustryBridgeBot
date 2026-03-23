@@ -4,8 +4,7 @@
 #include "selectitemstablewigget.h"
 #include "tgbotmanager.h"
 #include "tgobject.h"
-#include "opctag.h"
-#include "opcdatamanager.h"
+#include "datatag.h"
 
 TGEventsConfigurationWidget::TGEventsConfigurationWidget(TgBotManager& tg_bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -71,9 +70,9 @@ void TGEventsConfigurationWidget::sl_opc_table_messages_double_click(int row, in
     }
     bool b = false;
     size_t tag_id = tbl->item(row, 0) ? tbl->item(row,0)->text().toInt(&b) : -1;
-    std::shared_ptr<OPC_HELPER::OPCTag> opc_tag = nullptr;
+    std::shared_ptr<DataTag> opc_tag = nullptr;
     if(b) {
-        opc_tag = tg_bot_manager_.GetTGParent()->OPCManager()->GetOPCTag(tag_id);
+        opc_tag = tg_bot_manager_.GetTGParent()->TagManager()->GetTagOfId(tag_id);
     }
 
     ui->leTagCompareValue->setText("0");
@@ -143,9 +142,9 @@ void TGEventsConfigurationWidget::save_to_current_event_()
         tag_str = tag_str.left(id_ind);
         tag_id = tag_str.toInt(&b);
     }
-    std::shared_ptr<OPC_HELPER::OPCTag> opc_tag = nullptr;
+    std::shared_ptr<DataTag> opc_tag = nullptr;
     if(b) {
-        opc_tag = tg_bot_manager_.GetTGParent()->OPCManager()->GetOPCTag(tag_id);
+        opc_tag = tg_bot_manager_.GetTGParent()->TagManager()->GetTagOfId(tag_id);
     }
 
     if(opc_tag) {
@@ -168,7 +167,7 @@ void TGEventsConfigurationWidget::save_to_current_event_()
         }
         current_event_->SetAuthorizationLevel(us_type);
 
-        OPC_HELPER::OpcValueType val, hyst;
+        ValueVariant val, hyst;
         QString val_str = ui->leTagCompareValue->text();
         QString hyst_str = ui->leTagCompareValueHysterezis->text();
 
@@ -184,7 +183,7 @@ void TGEventsConfigurationWidget::save_to_current_event_()
             val = val_str;
             hyst = hyst_str;
         }
-        current_event_->SetTagTrigger(opc_tag, type, val, hyst);
+        current_event_->SetTagTrigger(tag_id, type, val, hyst);
     }
 
     message_to_event_->SetMessagesToCommand(current_event_);
@@ -257,9 +256,11 @@ void TGEventsConfigurationWidget::load_data_from_event_(const std::string &id)
     ui->leTagCompareValueHysterezis->setEnabled(true);
     ui->cbTGEventConfUserLevel->setEnabled(true);
 
-    auto [tag_ptr, type, ival, ihys] = current_event_->GetTagTrigger();
-    if(tag_ptr) {
-        ui->leTagNameEvent->setText(QString("%1: %2").arg(tg_bot_manager_.GetTGParent()->OPCManager()->GetTagId(tag_ptr->GetTagName())).arg(tag_ptr->GetTagName()));
+    auto [tag_id, type, ival, ihys] = current_event_->GetTagTrigger();
+    if(tag_id > 0) {
+        auto tag_ptr = tg_bot_manager_.GetTGParent()->TagManager()->GetTagOfId(tag_id);
+        ui->leTagNameEvent->setText(QString("%1: %2").arg(tag_id).arg(tag_ptr->GetTagName()));
+
         int cb_index = 0;
 
         switch(type) {
@@ -275,10 +276,10 @@ void TGEventsConfigurationWidget::load_data_from_event_(const std::string &id)
 
         ui->cbTGEventConfCompareType->setCurrentIndex(cb_index);
 
-        ui->leTagCompareValue->setText(OPC_HELPER::toString(ival));
-        ui->leTagCompareValue->setValidator(get_event_values_validator(tag_ptr));
-        ui->leTagCompareValueHysterezis->setText(OPC_HELPER::toString(ihys));
-        ui->leTagCompareValueHysterezis->setValidator(get_event_values_validator(tag_ptr));
+        ui->leTagCompareValue->setText(DATATAG::toString(ival));
+        ui->leTagCompareValue->setValidator(get_event_values_validator(tag_ptr.get()));
+        ui->leTagCompareValueHysterezis->setText(DATATAG::toString(ihys));
+        ui->leTagCompareValueHysterezis->setValidator(get_event_values_validator(tag_ptr.get()));
     }
 
     int auth_ind;
@@ -342,14 +343,10 @@ void TGEventsConfigurationWidget::resizeEvent(QResizeEvent *event)
 }
 
 void TGEventsConfigurationWidget::fill_opc_tags_table_(QTableWidget* tbl) {
-    std::map<size_t, std::shared_ptr<OPC_HELPER::OPCTag>> map_id_to_tags;
-    std::vector<std::shared_ptr<OPC_HELPER::OPCTag>> tags_to_read;
-
-    map_id_to_tags = tg_bot_manager_.GetTGParent()->OPCManager()->GetIdToTagPeriodicTags();
-    tags_to_read = tg_bot_manager_.GetTGParent()->OPCManager()->GetPeriodicTags();
+    auto map_id_to_tags = tg_bot_manager_.GetTGParent()->TagManager()->GetIdToTagsMap();
 
     tbl->setColumnCount(3);
-    tbl->setRowCount(tags_to_read.size());
+    tbl->setRowCount(map_id_to_tags.size());
     tbl->setHorizontalHeaderLabels({"ID", "Имя тэга", "Тип"});
     tbl->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter | (Qt::Alignment)Qt::TextWordWrap);
     tbl->verticalHeader()->setVisible(false);
@@ -393,7 +390,7 @@ void TGEventsConfigurationWidget::opc_table_set_column_width_(QTableWidget* tbl)
     tbl->setColumnWidth(2, w3 - 2);
 }
 
-QValidator* TGEventsConfigurationWidget::get_event_values_validator(const OPC_HELPER::OPCTag* tag) const
+QValidator* TGEventsConfigurationWidget::get_event_values_validator(const DataTag* tag) const
 {
     if(!tag) return nullptr;
     if(tag->ValueIsReal()) return new QDoubleValidator(-10000.0, 10000.0, 1);

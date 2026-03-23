@@ -6,6 +6,7 @@
 #include <QSystemTrayIcon>
 
 #include "copcclient.h"
+#include "datatag.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -13,11 +14,8 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-namespace OPC_HELPER {
-class OPCDataManager;
-}
-
 class TgBotManager;
+class SourceDriverManager;
 class QSystemTrayIcon;
 class QLabel;
 
@@ -26,7 +24,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(TgBotManager* bot_manager, OPC_HELPER::OPCDataManager* opc_data_manager, QWidget *parent = nullptr);
+    MainWindow(TgBotManager* bot_manager, SourceDriverManager* driver_manager, QWidget *parent = nullptr);
     virtual ~MainWindow();
 
     static int const EXIT_CODE_REBOOT;
@@ -49,7 +47,7 @@ private slots:
     void sl_pb_close_app_clicked();
     void sl_pb_opcbrowse_page_clicked();
     void sl_pb_opcmanage_page_clicked();
-    void sl_status_bar_opc_label_change_text(QString text);
+    void sl_status_bar_opc_label_change_text(DataTag::DataSource driver, bool is_connected);
     void sl_status_bar_bot_label_change_text();
     void sl_status_bar_message_label_change_text(QString message);
     void sl_pb_tgsettings_page_clicked();
@@ -65,14 +63,15 @@ private:
 
     OPC_HELPER::COPCClient tst_dlg_;
     TgBotManager* tg_bot_manager_ = nullptr;
-    OPC_HELPER::OPCDataManager* opc_data_manager_ = nullptr;
+    SourceDriverManager* source_data_manager_ = nullptr;
 
     QMenu *trayIconMenu;
     QAction *minimizeAction;
     QAction *restoreAction;
     QAction *quitAction;
     QSystemTrayIcon *trayIcon;
-    QLabel *status_bar_opc_label_;
+    QLabel *status_bar_opc_da_label_;
+    QLabel *status_bar_opc_ua_label_;
     QLabel *status_bar_bot_label_;
     QLabel *status_bar_message_label_;
 

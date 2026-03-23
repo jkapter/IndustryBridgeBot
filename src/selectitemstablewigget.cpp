@@ -84,13 +84,13 @@ void SelectItemsTableWidget::ReadCommandContent(const TGTrigger* command)
         ++row_index;
     }
 
-    for(const auto & [tag, val]: command->GetOpcTagsWSetValues()) {
+    for(const auto & [id, val]: command->GetIdTagsWSetValues()) {
         QComboBox* cb_com = qobject_cast<QComboBox*>(cellWidget(row_index, 0));
         QComboBox* cb_mes = qobject_cast<QComboBox*>(cellWidget(row_index, 1));
-        if(!cb_com || !cb_mes || !bot_manager_.GetTGParent()->OPCManager()) return;
+        if(!cb_com || !cb_mes || !bot_manager_.GetTGParent()->TagManager()) return;
         cb_com->setCurrentIndex(2);
-        cb_mes->setCurrentText(QString("%1: %2").arg(bot_manager_.GetTGParent()->OPCManager()->GetTagId(tag->GetFullName())).arg(tag->GetTagName()));
-        item(row_index, 2)->setText(OPC_HELPER::toString(val));
+        cb_mes->setCurrentText(QString("%1: %2").arg(id).arg(bot_manager_.GetTGParent()->TagManager()->GetTagOfId(id)->GetTagName()));
+        item(row_index, 2)->setText(DATATAG::toString(val));
         item(row_index, 2)->setTextAlignment(Qt::AlignCenter);
         item(row_index, 2)->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled);
         ++row_index;
@@ -117,12 +117,8 @@ void SelectItemsTableWidget::SetMessagesToCommand(TGTrigger* command)
             bool b = false;
 
             size_t id_tag = id.left(id.indexOf(':')).toULongLong(&b);
-            std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr = nullptr;
-            if(b && bot_manager_.GetTGParent()->OPCManager()) {
-                tag_ptr = bot_manager_.GetTGParent()->OPCManager()->GetOPCTag(id_tag);
-            }
-            if(tag_ptr) {
-                command->AddOPCTagWValue(tag_ptr, item(i, 2)->text());
+            if(b) {
+                command->AddOPCTagWValue(id_tag, item(i, 2)->text());
             }
         }
     }
@@ -262,14 +258,8 @@ void SelectItemsTableWidget::update_content_messages_()
             QStringList tag_list;
             QMap<size_t, QString> tags_id_to_names;
 
-            auto tags = bot_manager_.GetTGParent()->OPCManager()->GetPeriodicTags();
-
-            for(size_t j = 0; j < tags.size(); ++j) {
-                tags_id_to_names[bot_manager_.GetTGParent()->OPCManager()->GetTagId(tags.at(j)->GetFullName())] = tags.at(j)->GetTagName();
-            }
-
-            for(auto it = tags_id_to_names.begin(); it != tags_id_to_names.end(); ++it) {
-                tag_list.push_back(QString("%1: %2").arg(it.key()).arg(it.value()));
+            for(const auto& [id, tag_ptr]: bot_manager_.GetTGParent()->TagManager()->GetIdToTagsMap()) {
+                tag_list.push_back(QString("%1: %2").arg(id).arg(tag_ptr->GetTagName()));
             }
             tag_list.push_front(" - ");
 

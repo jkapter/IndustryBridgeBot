@@ -19,6 +19,7 @@ OPCDataManager::OPCDataManager()
     : QObject()
 {
     tag_name_check_re_.setPattern("^([^@]*)@([^@#].*)#(.*)$");
+// ^\[([^\[].*[^\]])\]\[([^\[].*[^\]])\]\[([^\[].*[^\]])\]$ [host][server][tag]
     RestoreDataFromFile();
 }
 

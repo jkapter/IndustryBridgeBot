@@ -2,10 +2,12 @@
 
 #include <QTimer>
 
+#include "datatag.h"
+
 using namespace OPC_HELPER;
 using namespace Qt::StringLiterals;
 
-OPCDAWorker::OPCDAWorker(std::vector<std::shared_ptr<OPCTag>>& tags, QObject *parent)
+OPCDAWorker::OPCDAWorker(std::vector<std::shared_ptr<DataTag>>& tags, QObject *parent)
     : OPCDAWorker(parent)
 {
     SetTagsList(tags);
@@ -17,25 +19,27 @@ OPCDAWorker::OPCDAWorker(QObject *parent)
 
 OPCDAWorker::~OPCDAWorker()
 {
-    //qDebug() << "OPCDAWorker destructor!";
+    sl_stop_reading();
 }
 
-void OPCDAWorker::SetTagsList(const std::vector<std::shared_ptr<OPCTag>>& tags) {
+void OPCDAWorker::SetTagsList(const std::vector<std::shared_ptr<DataTag>>& tags) {
     tags_.clear();
     tags_.reserve(tags.size());
-    tags_ = tags;
     hostnames_.clear();
     hostname_to_server_names_.clear();
 
-    for(const auto& tag: tags_) {
-        auto host_it = hostnames_.insert(tag->GetHostname()).first;
-        hostname_to_server_names_[&(*host_it)].insert(tag->GetServerName());
+    for(const auto& tag: tags) {
+        if(tag->GetDataSource() != ::DataTag::DataSource::OPCDA) continue;
+        auto casted_tag = std::static_pointer_cast<DataTagOpcDA>(tag);
+        tags_.push_back(casted_tag);
+        auto host_it = hostnames_.insert(casted_tag->GetHostName()).first;
+        hostname_to_server_names_[&(*host_it)].insert(casted_tag->GetEndpointName());
     }
 
-    qInfo() << QString("ОРС клиент поток [%1]: добавлено %2 тэгов для чтения.").arg(QThread::currentThread()->objectName()).arg(tags.size());
+    qInfo() << QString("ОРС DA клиент поток [%1]: добавлено %2 тэгов для чтения.").arg(QThread::currentThread()->objectName()).arg(tags.size());
 }
 
-void OPCDAWorker::SetTagsList(const std::vector<std::shared_ptr<OPCTag> > &&tags)
+void OPCDAWorker::SetTagsList(const std::vector<std::shared_ptr<DataTag>> &&tags)
 {
     auto vec = std::move(tags);
     SetTagsList(vec);
@@ -52,7 +56,7 @@ void OPCDAWorker::sl_read_tags()
     try {
         size_t res = opc_client_->WriteTags();
         if(res > 0) {
-            QString log_message = QString("ОРС клиент: записано %1 тэгов.").arg(res);
+            QString log_message = QString("ОРС DA клиент: записано %1 тэгов.").arg(res);
             emit sg_send_message_to_console(log_message);
             qInfo() << log_message;
             emit sg_writing_tags(res);
@@ -126,7 +130,6 @@ void OPCDATagBrowser::sl_process()
                      this, SIGNAL(sg_get_all_tag_names_from_server(const QString&, const QString&, size_t)));
 
     try {
-        QMutexLocker locker(&vec_lock_);
         tags_list_.clear();
         tags_list_.reserve(1000);
         auto res_vec = opc_client_->GetOPCTagsNames(hostname_, server_name_);

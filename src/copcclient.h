@@ -11,9 +11,11 @@
 
 #include "opcda.h"
 
-namespace OPC_HELPER {
+class DataTagOpcDA;
+class DataTag;
 
-class OPCTag;
+
+namespace OPC_HELPER {
 
 QString GetErrorStringFromHRESULT(HRESULT hr);
 QString GetServerStatus(const OPCSERVERSTATUS& status_struct);
@@ -34,15 +36,15 @@ public:
     DWORD dwCount() const;
     [[nodiscard]] OPCHANDLE* GetTagHandlesArrayToRead() const;
     [[nodiscard]] std::tuple<OPCHANDLE*, VARIANT*, DWORD> GetTagHandlesArrayToWrite() const;
-    bool CheckTagExist(const std::shared_ptr<OPCTag>& tag) const;
-    bool AddTagWithHandle(std::shared_ptr<OPCTag>& tag, OPCHANDLE hnd);
+    bool CheckTagExist(const std::shared_ptr<DataTagOpcDA>& tag) const;
+    bool AddTagWithHandle(std::shared_ptr<DataTagOpcDA>& tag, OPCHANDLE hnd);
     void ClearTags();
-    std::shared_ptr<OPCTag> GetTagPtr(OPCHANDLE hnd) const;
-    OPCHANDLE GetTagHandle(std::shared_ptr<OPCTag>& tag) const;
+    std::shared_ptr<DataTagOpcDA> GetTagPtr(OPCHANDLE hnd) const;
+    OPCHANDLE GetTagHandle(std::shared_ptr<DataTagOpcDA>& tag) const;
     size_t GetTagsCount() const;
 private:
-    std::unordered_map<std::shared_ptr<OPCTag>, OPCHANDLE> tag_to_opchandle_;
-    std::unordered_map<OPCHANDLE, std::shared_ptr<OPCTag>> opchandle_to_tag_;
+    std::unordered_map<std::shared_ptr<DataTagOpcDA>, OPCHANDLE> tag_to_opchandle_;
+    std::unordered_map<OPCHANDLE, std::shared_ptr<DataTagOpcDA>> opchandle_to_tag_;
 
 };
 
@@ -56,7 +58,7 @@ public:
     const std::vector<QString>& GetOPCTagsNames(const QString& hostname, const QString& server_name, int notify_of_portion = 50);
 
     void RefreshOPCServersList();
-    size_t AddTags(std::vector<std::shared_ptr<OPCTag>>& tags);
+    size_t AddTags(std::vector<std::shared_ptr<DataTagOpcDA>>& tags);
     size_t ReadTags();
     size_t WriteTags();
     void ClearTags();
@@ -87,7 +89,7 @@ private:
     void disconnect_server_(const GUID* guid_ptr);
     bool register_group_(const GUID* guid_ptr);
     void remove_group_(const GUID* guid_ptr);
-    size_t add_tags_to_group_(const GUID* guid_ptr, std::vector<std::shared_ptr<OPCTag>>& tags);
+    size_t add_tags_to_group_(const GUID* guid_ptr, std::vector<std::shared_ptr<DataTagOpcDA>>& tags);
     size_t read_server_tags_(const GUID* guid_ptr);
     size_t write_server_tags_(const GUID* guid_ptr);
 };

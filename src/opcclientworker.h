@@ -7,8 +7,9 @@
 
 #include "opcda.h"
 
-#include "opctag.h"
+//#include "opctag.h"
 #include "copcclient.h"
+#include "datatag.h"
 
 class QMutex;
 class QTimer;
@@ -19,12 +20,11 @@ class OPCDATagBrowser: public QObject
 {
     Q_OBJECT
 public:
-    OPCDATagBrowser(const QString& hostname, const QString& server_name, std::vector<QString>& tags_ret_vec, QMutex& vec_lock,  QObject *parent = nullptr)
+    OPCDATagBrowser(const QString& hostname, const QString& server_name, std::vector<QString>& tags_ret_vec, QObject *parent = nullptr)
         : QObject(parent)
         , hostname_(hostname)
         , server_name_(server_name)
         , tags_list_(tags_ret_vec)
-        , vec_lock_(vec_lock)
     {}
 
 signals:
@@ -43,7 +43,6 @@ private:
     QString hostname_;
     QString server_name_;
     std::vector<QString>& tags_list_;
-    QMutex& vec_lock_;
     bool request_interrupt_ = false;
 };
 
@@ -51,11 +50,11 @@ class OPCDAWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit OPCDAWorker(std::vector<std::shared_ptr<OPCTag>>& tags, QObject *parent = nullptr);
+    explicit OPCDAWorker(std::vector<std::shared_ptr<DataTag>>& tags, QObject *parent = nullptr);
     OPCDAWorker(QObject *parent = nullptr);    
     virtual ~OPCDAWorker();
-    void SetTagsList(const std::vector<std::shared_ptr<OPCTag>>& tags);
-    void SetTagsList(const std::vector<std::shared_ptr<OPCTag>>&& tags);
+    void SetTagsList(const std::vector<std::shared_ptr<DataTag>>& tags);
+    void SetTagsList(const std::vector<std::shared_ptr<DataTag>>&& tags);
     bool SetPeriodicReading(int period);
 
 signals:
@@ -75,7 +74,7 @@ private slots:
     void sl_read_tags();
 
 private:
-    std::vector<std::shared_ptr<OPCTag>> tags_;
+    std::vector<std::shared_ptr<DataTagOpcDA>> tags_;
     std::set<QString> hostnames_;
     int period_reading_ = 0;
     std::unordered_map<const QString*, std::set<QString>> hostname_to_server_names_;

@@ -11,12 +11,10 @@
 
 #include "tgobject.h"
 #include "tgbot/Bot.h"
+#include "datatagregistry.h"
 
-namespace OPC_HELPER {
-class OPCDataManager;
-class OPCTag;
-}
-
+class DataTag;
+class SourceDriverManager;
 class TGTriggerUserCommand;
 class TGTriggerTagValue;
 class TGMessage;
@@ -57,8 +55,8 @@ class TgBotManager: public QObject
 {
     Q_OBJECT
 public:
-    explicit TgBotManager(const std::string& bot_token, OPC_HELPER::OPCDataManager& opc_manager);
-    TgBotManager(OPC_HELPER::OPCDataManager& opc_manager);
+    explicit TgBotManager(const std::string& bot_token, SourceDriverManager& driver_manager);
+    TgBotManager(SourceDriverManager& driver_manager);
     virtual ~TgBotManager();
 
     bool BotIsWorking() const;
@@ -130,6 +128,8 @@ private:
     bool auto_restart_bot_ = false;
     bool bot_started_ = false;
 
+    SourceDriverManager* driver_manager_;
+
     std::unique_ptr<TGParent> tg_parent_ = nullptr;
     QTimer* check_events_timer_ = nullptr;
     QTimer* check_restart_timer_ = nullptr;
@@ -153,7 +153,7 @@ private:
     std::unordered_map<std::string, std::unique_ptr<TGScheduledEvent>> id_to_scheduled_events_;
     std::unordered_map<std::string, std::function<void(const TgBot::CallbackQuery::Ptr)>> id_to_callback_;
     std::unordered_map<std::string, std::function<void(const TgBot::CallbackQuery::Ptr)>> admin_tools_to_callback_;
-    std::unordered_map<QString, std::pair<std::shared_ptr<OPC_HELPER::OPCTag>, size_t>> server_to_sample_and_nomber_tag_;
+    std::unordered_map<QString, std::pair<std::shared_ptr<DataTag>, size_t>> server_to_sample_and_nomber_tag_;
     std::function<bool()> check_opc_status_ = [](){return false;};
 
     bool opc_comm_status_previous_scan_ = false;

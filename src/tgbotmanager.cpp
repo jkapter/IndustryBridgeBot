@@ -16,9 +16,9 @@
 #include "tgbot/tools/StringTools.h"
 #include "tgbot/Bot.h"
 
-#include "opcdatamanager.h"
-#include "opctag.h"
 #include "tgbotthreadwrapper.h"
+#include "datatag.h"
+#include "sourcedrivermanager.h"
 
 QByteArray TGHELPER::EncryptDecryptTokenString(const QByteArray& text, const std::string& key)
 {
@@ -139,9 +139,10 @@ void TgBotUser::UpdateData(TgBot::Message::Ptr message) {
 //============ T G B O T M A N A G E R ==========================
 //===============================================================
 
-TgBotManager::TgBotManager(const std::string& bot_token, OPC_HELPER::OPCDataManager& opc_manager)
+TgBotManager::TgBotManager(const std::string& bot_token, SourceDriverManager& driver_manager)
     : QObject()
     , bot_token_(bot_token)
+    , driver_manager_(&driver_manager)
     , check_events_timer_(new QTimer(this))
     , check_restart_timer_(new QTimer(this))
 {
@@ -150,7 +151,7 @@ TgBotManager::TgBotManager(const std::string& bot_token, OPC_HELPER::OPCDataMana
     QObject::connect(check_events_timer_, SIGNAL(timeout()), this, SLOT(sl_check_events_timer_out()));
     QObject::connect(check_restart_timer_, SIGNAL(timeout()), this, SLOT(sl_check_restart_timer_out()));
 
-    tg_parent_ = std::make_unique<TGParent>(&opc_manager);
+    tg_parent_ = std::make_unique<TGParent>(*driver_manager.TagRegistry());
 
     check_restart_timer_->setInterval(RESTART_BOT_PERIOD_);
     check_restart_timer_->start();
@@ -163,8 +164,8 @@ TgBotManager::TgBotManager(const std::string& bot_token, OPC_HELPER::OPCDataMana
     }
 }
 
-TgBotManager::TgBotManager(OPC_HELPER::OPCDataManager &opc_manager)
-    : TgBotManager(TGHELPER::ReadTokenFromFile(QString("token.dat")), opc_manager)
+TgBotManager::TgBotManager(SourceDriverManager& dm)
+    : TgBotManager(TGHELPER::ReadTokenFromFile(QString("token.dat")), dm)
 {}
 
 TgBotManager::~TgBotManager() {
@@ -318,11 +319,11 @@ void TgBotManager::make_admin_tools_() {
     admin_tools_to_callback_.clear();
     server_to_sample_and_nomber_tag_.clear();
 
-    for(const auto& tag: tg_parent_->OPCManager()->GetPeriodicTags()) {
-        if(server_to_sample_and_nomber_tag_.count(tag->GetServerName()) == 0) {
-            server_to_sample_and_nomber_tag_[tag->GetServerName()] = {tag, 1};
+    for(const auto& tag: tg_parent_->TagManager()->GetAllTags()) {
+        if(!server_to_sample_and_nomber_tag_.contains(tag->GetEndpointName())) {
+            server_to_sample_and_nomber_tag_[tag->GetEndpointName()] = {tag, 1};
         } else {
-            ++server_to_sample_and_nomber_tag_.at(tag->GetServerName()).second;
+            ++server_to_sample_and_nomber_tag_.at(tag->GetEndpointName()).second;
         }
     }
 
@@ -352,7 +353,7 @@ void TgBotManager::make_admin_tools_() {
 
     admin_tools_to_callback_["admin_opc_data"] = [this](const TgBot::CallbackQuery::Ptr query) {
         QString mes = "Данные OPC:\n";
-        if(tg_parent_->OPCManager()->PeriodicReadingOn()) {
+        if(driver_manager_->InWork()) {
             mes.append("OPC клиент запущен. \n");
         } else {
             mes.append("OPC клиент остановлен. \n");
@@ -362,8 +363,7 @@ void TgBotManager::make_admin_tools_() {
             mes.append(QString("Сервер [%1] количество тэгов [%2], статус связи: 0x%3 [%4]\n")
                            .arg(server)
                            .arg(pair_tag_n.second)
-                           .arg(pair_tag_n.first->GetTagQuality(), 0, 16)
-                           .arg(OPC_HELPER::GetQualityString(pair_tag_n.first->GetTagQuality())));
+                           .arg(DataTag::QualityToString(pair_tag_n.first->GetTagQuality())));
         }
         std::string std_mes = mes.toStdString();
         screen_symbols_(std_mes, screened_symbols_);
@@ -375,7 +375,7 @@ void TgBotManager::make_admin_tools_() {
     btn->callbackData = "admin_opc_restart";
     main_admin_kb->inlineKeyboard.push_back({btn});
     admin_tools_to_callback_["admin_opc_restart"] = [this](const TgBot::CallbackQuery::Ptr query) {
-        tg_parent_->OPCManager()->StartPeriodReading();
+        driver_manager_->StartPeriodReading();
         tg_parent_->BotSendMessage(query->message->chat->id, "Перезапуск ОРС клиента");
     };
 
@@ -695,17 +695,15 @@ void TgBotManager::make_opc_communication_event_()
             bool b = false;
             for(const auto& [server, pair_tag_n]: server_to_sample_and_nomber_tag_) {
                 if(b) continue;
-                b = pair_tag_n.first->GetTagQuality() != 0xc0;
+                b = pair_tag_n.first->GetTagQuality() != DataTag::DataQuality::GOOD;
             }
             if(!b) return false;
             if(b && opc_comm_status_previous_scan_) return true;
 
             QString mes{"Ошибка связи OPC.\n"};
             for(const auto& [server, pair_tag_n]: server_to_sample_and_nomber_tag_) {
-                mes.append(QString("Сервер [%1] статус связи: 0x%2 %3\n")
-                    .arg(server)
-                    .arg(pair_tag_n.first->GetTagQuality(), 0, 16)
-                    .arg(OPC_HELPER::GetQualityString(pair_tag_n.first->GetTagQuality())));
+                mes.append(QString("Сервер [%1] статус связи: 0x%2\n")
+                    .arg(server, DataTag::QualityToString(pair_tag_n.first->GetTagQuality())));
             }
 
             std::string std_mes = mes.toStdString();
@@ -783,9 +781,9 @@ void TgBotManager::StartBot() {
         bot_worker->moveToThread(bot_thread);
         bot_thread->start();
 
-        if(tg_parent_ && !tg_parent_->OPCManager()->PeriodicReadingOn()) {
+        /*if(tg_parent_ && !tg_parent_->OPCManager()->PeriodicReadingOn()) {
             tg_parent_->OPCManager()->StartPeriodReading();
-        }
+        }*/
     }
 }
 
@@ -1209,11 +1207,9 @@ std::unique_ptr<TGTriggerTagValue> TgBotManager::parse_tag_trigger_from_json_(QJ
         }
         ret_trg->SetObjectInWork(b);
 
-        std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr = tg_parent_->OPCManager()->GetOPCTag(static_cast<size_t>(obj.value("tag_id").toInteger()));
-        if(!tag_ptr) return nullptr;
         QString comp_type_qstr = obj.value("comparision_type").toString();
         COMPARE_TYPE comp_type;
-        OPC_HELPER::OpcValueType val, hys;
+        ValueVariant val, hys;
         if(comp_type_qstr == "EQUAL") {
             comp_type = COMPARE_TYPE::EQUAL;
         } else if(comp_type_qstr == "LESS") {
@@ -1240,7 +1236,7 @@ std::unique_ptr<TGTriggerTagValue> TgBotManager::parse_tag_trigger_from_json_(QJ
             hys = static_cast<double>(obj.value("hysterezis").toDouble());
         }
 
-        ret_trg->SetTagTrigger(tag_ptr, comp_type, val, hys);
+        ret_trg->SetTagTrigger(static_cast<size_t>(obj.value("tag_id").toInteger()), comp_type, val, hys);
         ret_trg->SetAuthorizationLevel(tg_user_type_from_qstring(obj.value("auth_level").toString()));
 
         for(int i = 0; i < obj.value("messages").toArray().size(); ++i) {
@@ -1278,9 +1274,7 @@ std::unique_ptr<TGButtonWCallback> TgBotManager::parse_inline_button_from_json_w
 
             for(const auto& tag_obj: obj.value("tag_to_set").toArray()) {
                 if(!tag_obj.isObject() || !tag_obj.toObject().contains("tag_id") || !tag_obj.toObject().value("tag_id").isDouble()) continue;
-                auto tag_ptr = tg_parent_->OPCManager()->GetOPCTag(tag_obj.toObject().value("tag_id").toInteger());
-                if(!tag_ptr) continue;
-                OPC_HELPER::OpcValueType val;
+                ValueVariant val;
                 if(tag_obj.toObject().contains("int_value")) {
                     val = tag_obj.toObject().value("int_value").toInteger();
                 } else if(tag_obj.toObject().contains("double_value")) {
@@ -1290,7 +1284,7 @@ std::unique_ptr<TGButtonWCallback> TgBotManager::parse_inline_button_from_json_w
                 } else {
                     val = 0;
                 }
-                ret_btn->AddOPCTagWValue(tag_ptr, val);
+                ret_btn->AddOPCTagWValue(tag_obj.toObject().value("tag_id").toInteger(), val);
             }
         }
         return ret_btn;

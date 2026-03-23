@@ -2,10 +2,9 @@
 #include "ui_tgmessageconfigurationwidget.h"
 
 #include "selectitemstablewigget.h"
-#include "opctag.h"
+#include "datatag.h"
 #include "tgbotmanager.h"
 #include "tgobject.h"
-#include "opcdatamanager.h"
 
 TGMessageConfigurationWidget::TGMessageConfigurationWidget(TgBotManager &tg_bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -49,14 +48,10 @@ void TGMessageConfigurationWidget::resizeEvent(QResizeEvent *event)
 }
 
 void TGMessageConfigurationWidget::fill_opc_tags_table_(QTableWidget* tbl) {
-    std::map<size_t, std::shared_ptr<OPC_HELPER::OPCTag>> map_id_to_tags;
-    std::vector<std::shared_ptr<OPC_HELPER::OPCTag>> tags_to_read;
-
-    map_id_to_tags = tg_bot_manager_.GetTGParent()->OPCManager()->GetIdToTagPeriodicTags();
-    tags_to_read = tg_bot_manager_.GetTGParent()->OPCManager()->GetPeriodicTags();
+    auto  map_id_to_tags = tg_bot_manager_.GetTGParent()->TagManager()->GetIdToTagsMap();
 
     tbl->setColumnCount(3);
-    tbl->setRowCount(tags_to_read.size());
+    tbl->setRowCount(map_id_to_tags.size());
     tbl->setHorizontalHeaderLabels({"ID", "Имя тэга", "Тип"});
     tbl->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter | (Qt::Alignment)Qt::TextWordWrap);
     tbl->verticalHeader()->setVisible(false);
@@ -142,7 +137,7 @@ void TGMessageConfigurationWidget::load_data_from_message_(const std::string &id
     fill_opc_tags_table_(ui->twOPCTagsList);
 
     if(current_message_->HasTags()) {
-        for(const auto& tag_id: current_message_->GetOPCTagIDs()) {
+        for(const auto& tag_id: current_message_->GetTagIDs()) {
             const auto matched_items = ui->twOPCTagsList->findItems(QString::number(tag_id), Qt::MatchExactly);
             for(const auto& item: matched_items) {
                 for(auto c = 0; c < ui->twOPCTagsList->columnCount(); ++c) {

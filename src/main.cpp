@@ -8,14 +8,13 @@
 #include <QThread>
 #include <Qdir>
 #include <QFile>
-#include <QtCore>
 #include <QString>
 
 #include "logger.h"
 #include "tgbotmanager.h"
 #include "opcdatamanager.h"
-
-//#include "opctag.h"
+#include "sourcedrivermanager.h"
+#include "datatagregistry.h"
 
 bool check_argv(const char* argv, const char* par, std::string_view& value) {
     std::string_view par_str(par);
@@ -64,8 +63,13 @@ int main(int argc, char *argv[])
     }
 
     do {
-        std::unique_ptr<OPC_HELPER::OPCDataManager> opc_manager_ptr(new OPC_HELPER::OPCDataManager());
-        std::unique_ptr<TgBotManager> tg_bot_manager_ptr(new TgBotManager(*opc_manager_ptr.get()));
+
+        qInfo() << QString("Проверка кодировки");
+
+        std::unique_ptr<DataTagRegistry> tag_registry = std::make_unique<DataTagRegistry>("opctags.json");
+        tag_registry->RestoreDataFromFile();
+        std::unique_ptr<SourceDriverManager> driver_manager = std::make_unique<SourceDriverManager>(tag_registry.get());
+        std::unique_ptr<TgBotManager> tg_bot_manager_ptr(new TgBotManager(*driver_manager.get()));
         bool start_app_minimized = false;
 
         {
@@ -82,7 +86,7 @@ int main(int argc, char *argv[])
         input_file.close();
         }
 
-        MainWindow w(tg_bot_manager_ptr.get(), opc_manager_ptr.get());
+        MainWindow w(tg_bot_manager_ptr.get(), driver_manager.get());
 
         if(!start_app_minimized) {
             w.show();

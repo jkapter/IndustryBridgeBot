@@ -7,7 +7,7 @@
 #include "opccomn.h"
 #include "opcerror.h"
 
-#include "opctag.h"
+#include "datatag.h"
 
 //IOPCServerList uuid(13486D50-4821-11D2-A494-3CB306C10000)
 __CRT_UUID_DECL(IOPCServerList, 0x13486D50, 0x4821, 0x11d2, 0xa4, 0x94, 0x3c, 0xb3, 0x06, 0xc1, 0x00, 0x00)
@@ -31,7 +31,7 @@ using namespace Qt::StringLiterals;
 COPCClient::COPCClient(): QObject()
 {
     qInfo() << QString("Новый экземпляр ОРС клиента, поток [%1]").arg(QThread::currentThread()->objectName());
-    CoInitializeEx(NULL, COINIT_MULTITHREADED);//COINIT_APARTMENTTHREADED);
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);//COINIT_APARTMENTTHREADED);
 }
 
 COPCClient::~COPCClient() {
@@ -148,10 +148,6 @@ int COPCClient::get_registered_servers_(const QString& hostname)
         return -1;
     }
 
-    wchar_t* pszProgID;
-    wchar_t* pszUserType;
-    wchar_t* pszVerIndProgID;
-
     GUID guid;
     int nServerCnt = 0;
     unsigned long iRetSvr;
@@ -159,6 +155,9 @@ int COPCClient::get_registered_servers_(const QString& hostname)
 
     while (iRetSvr != 0)
     {
+        wchar_t* pszProgID = NULL;
+        wchar_t* pszUserType = NULL;
+        wchar_t* pszVerIndProgID = NULL;
         nServerCnt++;
         pServerList->GetClassDetails(guid, &pszProgID, &pszUserType,  &pszVerIndProgID);
 
@@ -173,6 +172,9 @@ int COPCClient::get_registered_servers_(const QString& hostname)
         opc_server_guid_to_group_[&guid_servers_.back()] = {};
         opc_server_guid_to_tag_names_[&guid_servers_.back()] = {};
         pIEnumGuid->Next(1, &guid, &iRetSvr);
+        CoTaskMemFree(pszProgID);
+        CoTaskMemFree(pszUserType);
+        CoTaskMemFree(pszVerIndProgID);
     }
 
     pServerList->Release();
@@ -398,13 +400,13 @@ void COPCClient::remove_group_(const GUID* guid_ptr)
 
     OPCGroupHandler& group_handler = opc_server_guid_to_group_.at(guid_ptr);
 
-    if(opc_server_guid_to_group_.at(guid_ptr).pItemMgt != NULL) {
-        if(opc_server_guid_to_group_.at(guid_ptr).opc_handle_group != 0) {
+    if(group_handler.pItemMgt != NULL) {
+        if(group_handler.opc_handle_group != 0) {
             HRESULT* hErr = NULL;
             HRESULT hRes;
             if(group_handler.dwCount() > 0) {
                 OPCHANDLE* item_handlers = group_handler.GetTagHandlesArrayToRead();
-                hRes = opc_server_guid_to_group_.at(guid_ptr).pItemMgt->RemoveItems(group_handler.dwCount(), item_handlers, &hErr);
+                hRes = group_handler.pItemMgt->RemoveItems(group_handler.dwCount(), item_handlers, &hErr);
 
                 if(FAILED(hRes)) {
                     QString log_message = QString("ОРС-клиент поток [%1]: ошибка удаления элементов группы тэгов из сервера %2@%3. hRes = 0х%4 : %5")
@@ -475,7 +477,7 @@ size_t COPCClient::read_server_tags_(const GUID* guid_ptr)
 
     OPCHANDLE* pHandles = group_hnd.GetTagHandlesArrayToRead();
     tagOPCITEMSTATE *pItemValue = NULL;
-    HRESULT* pErrors;
+    HRESULT* pErrors = NULL;
 
     //Считываем элементы
     HRESULT hRes = group_hnd.pSyncIO->Read(OPC_DS_DEVICE, group_hnd.dwCount(), pHandles, &pItemValue, &pErrors);
@@ -526,13 +528,13 @@ size_t COPCClient::write_server_tags_(const GUID* guid_ptr)
         return 0;
     }
 
-    HRESULT* pErrors;
+    HRESULT* pErrors = NULL;
 
     //Считываем элементы
     HRESULT hRes = group_hnd.pSyncIO->Write(dwCount, pHandles, pItemValues, &pErrors);
 
     if(FAILED(hRes)) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка записи тэгов из сервера %2@%3. hRes = 0х%3 : %4")
+        QString log_message = QString("ОРС-клиент поток [%1]: ошибка записи тэгов из сервера %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -560,14 +562,14 @@ size_t COPCClient::write_server_tags_(const GUID* guid_ptr)
     }
 }
 
-size_t COPCClient::add_tags_to_group_(const GUID* guid_ptr, std::vector<std::shared_ptr<OPCTag>>& tags)
+size_t COPCClient::add_tags_to_group_(const GUID* guid_ptr, std::vector<std::shared_ptr<DataTagOpcDA>>& tags)
 {
     if(!guid_ptr) return 0;
     if(tags.size() == 0) return 0;
     if(!connect_server_(guid_ptr) || !register_group_(guid_ptr)) return 0;
 
     OPCGroupHandler& group_handler = opc_server_guid_to_group_.at(guid_ptr);
-    std::vector<std::shared_ptr<OPCTag>> tags_checked;
+    std::vector<std::shared_ptr<DataTagOpcDA>> tags_checked;
 
     for(const auto& it: tags) {
         if(!group_handler.CheckTagExist(it)) {
@@ -611,7 +613,7 @@ size_t COPCClient::add_tags_to_group_(const GUID* guid_ptr, std::vector<std::sha
 }
 
 const std::set<QString>& COPCClient::GetOPCServerNames(const QString& hostname) {
-    if(hostnames_.count(hostname) == 0 || host_to_opc_names_.count(&(*hostnames_.find(hostname))) == 0) {
+    if(!hostnames_.contains(hostname) || !host_to_opc_names_.contains(&(*hostnames_.find(hostname)))) {
         get_registered_servers_(hostname);
     }
 
@@ -657,21 +659,23 @@ const std::vector<QString>& COPCClient::GetOPCTagsNames(const QString& hostname,
     return opc_server_guid_to_tag_names_.at(guid_ptr);
 }
 
-size_t COPCClient::AddTags(std::vector<std::shared_ptr<OPCTag>> &tags)
+size_t COPCClient::AddTags(std::vector<std::shared_ptr<DataTagOpcDA>> &tags)
 {
-    std::unordered_map<const GUID*, std::vector<std::shared_ptr<OPCTag>>> tags_map_temp;
+    std::unordered_map<const GUID*, std::vector<std::shared_ptr<DataTagOpcDA>>> tags_map_temp;
     size_t ret_val = 0;
 
     for(const auto& it: tags) {
         if(!it) continue;
 
-        if(!hostnames_.contains(it->GetHostname())) {
-            get_registered_servers_(it->GetHostname());
+        if(!hostnames_.contains(it->GetHostName())) {
+            get_registered_servers_(it->GetHostName());
         }
-        auto host_it = hostnames_.find(it->GetHostname());
+        auto host_it = hostnames_.find(it->GetHostName());
 
-        if(!host_to_opc_names_.at(&(*host_it)).contains(it->GetServerName())) continue;
-        auto server_it = host_to_opc_names_.at(&(*host_it)).find(it->GetServerName());
+        if(!host_to_opc_names_.at(&(*host_it)).contains(it->GetEndpointName())) continue;
+        auto server_it = host_to_opc_names_.at(&(*host_it)).find(it->GetEndpointName());
+
+        auto casted_ptr = std::static_pointer_cast<DataTagOpcDA>(it);
 
         if(opc_server_to_guid_.contains(&(*server_it))
             && !opc_server_guid_to_group_.at(opc_server_to_guid_.at(&(*server_it))).CheckTagExist(it)) {
@@ -735,9 +739,6 @@ std::optional<OPCSERVERSTATUS> COPCClient::GetServerStatus(const QString& hostna
     HRESULT hres = opc_server_guid_to_IOPCSErver_.at(guid_ptr)->GetStatus(&ret_str_ptr);
     if(FAILED(hres)) {
         CoTaskMemFree(ret_str_ptr);
-        if(ret_str_ptr != NULL) {
-
-        }
         return std::nullopt;
     }
 
@@ -824,7 +825,7 @@ DWORD OPCGroupHandler::dwCount() const
     return ret_ptr;
 }
 
-bool OPCGroupHandler::AddTagWithHandle(std::shared_ptr<OPCTag> &tag, OPCHANDLE hnd)
+bool OPCGroupHandler::AddTagWithHandle(std::shared_ptr<DataTagOpcDA> &tag, OPCHANDLE hnd)
 {
     if(!CheckTagExist(tag)) {
         tag_to_opchandle_[tag] = hnd;
@@ -840,13 +841,13 @@ void OPCGroupHandler::ClearTags()
     opchandle_to_tag_.clear();
 }
 
-std::shared_ptr<OPCTag> OPCGroupHandler::GetTagPtr(OPCHANDLE hnd) const
+std::shared_ptr<DataTagOpcDA> OPCGroupHandler::GetTagPtr(OPCHANDLE hnd) const
 {
     if(opchandle_to_tag_.count(hnd) > 0) return opchandle_to_tag_.at(hnd);
     return nullptr;
 }
 
-OPCHANDLE OPCGroupHandler::GetTagHandle(std::shared_ptr<OPCTag> &tag) const
+OPCHANDLE OPCGroupHandler::GetTagHandle(std::shared_ptr<DataTagOpcDA> &tag) const
 {
     if(tag_to_opchandle_.count(tag) > 0) return tag_to_opchandle_.at(tag);
     return 0;
@@ -857,7 +858,7 @@ size_t OPCGroupHandler::GetTagsCount() const
     return opchandle_to_tag_.size();
 }
 
-bool OPCGroupHandler::CheckTagExist(const std::shared_ptr<OPCTag>& tag) const
+bool OPCGroupHandler::CheckTagExist(const std::shared_ptr<DataTagOpcDA>& tag) const
 {
     return tag_to_opchandle_.count(tag) > 0;
 }

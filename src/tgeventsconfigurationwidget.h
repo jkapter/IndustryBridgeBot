@@ -9,8 +9,8 @@ class TGTriggerTagValue;
 class TGScheduledEvent;
 class QValidator;
 class QTableWidget;
+class DataTag;
 
-namespace OPC_HELPER { class OPCTag; }
 namespace Ui {
 class TGEventsConfigurationWidget;
 }
@@ -55,7 +55,7 @@ private:
     void fill_opc_tags_table_(QTableWidget* tbl);
     void opc_table_set_column_width_(QTableWidget* tbl);
 
-    QValidator* get_event_values_validator(const OPC_HELPER::OPCTag* tag) const;
+    QValidator* get_event_values_validator(const DataTag* tag) const;
 };
 
 #endif // TGEVENTSCONFIFURATIONWIDGET_H

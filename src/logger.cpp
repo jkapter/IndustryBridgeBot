@@ -24,10 +24,10 @@ void Logger::check_and_rename_()
 {
     if(!logfile_) return;
     if(logfile_->size() > max_size_) {
-        logfile_->write(QString("========================================================================\r\n").toLocal8Bit());
-        logfile_->write(QString("Создание нового файла лога").toLocal8Bit());
+        logfile_->write(QString("========================================================================\r\n").toUtf8());
+        logfile_->write(QString("Создание нового файла лога").toUtf8());
         logfile_->flush();
-        logfile_->rename(QString("%1/%2_%3").arg(app_directory_, QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss").toLocal8Bit(), file_name_));
+        logfile_->rename(QString("%1/%2_%3").arg(app_directory_, QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss").toUtf8(), file_name_));
             logfile_->setFileName(QString("%1/%2").arg(app_directory_, file_name_));
 
         if(!logfile_->open(QIODevice::Append)) {
@@ -56,8 +56,8 @@ void Logger::Init(const QString &file_directory, const QString &file_name)
 
     logfile_->setFileName(QString("%1/%2").arg(app_directory_, file_name_));
     if(logfile_->open(QIODevice::Append)) {
-        logfile_->write(QString("========================================================================\r\n").toLocal8Bit());
-        logfile_->write(QString("%1\t-\tСтарт программы\r\n").arg(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss")).toLocal8Bit());
+        logfile_->write(QString("========================================================================\r\n").toUtf8());
+        logfile_->write(QString("%1\t-\tСтарт программы\r\n").arg(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss")).toUtf8());
         logfile_->flush();
 
         original_handler_ = qInstallMessageHandler(&Logger::LogMessage);
@@ -71,8 +71,8 @@ void Logger::Init(const QString &file_directory, const QString &file_name)
 void Logger::Clear()
 {
     if (logfile_) {
-        logfile_->write(QString("%1\t-\tСтоп программы\r\n").arg(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss")).toLocal8Bit());
-        logfile_->write(QString("========================================================================\r\n").toLocal8Bit());
+        logfile_->write(QString("%1\t-\tСтоп программы\r\n").arg(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss")).toUtf8());
+        logfile_->write(QString("========================================================================\r\n").toUtf8());
         logfile_->flush();
         logfile_->close();
         delete logfile_;

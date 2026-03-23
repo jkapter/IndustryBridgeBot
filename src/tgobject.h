@@ -18,13 +18,11 @@
 #include "tgbot/types/InlineKeyboardButton.h"
 #include "tgbot/types/CallbackQuery.h"
 
-namespace TgBot { class Bot;}
-namespace OPC_HELPER {
-class OPCDataManager;
-class OPCTag;
-using OpcValueType = std::variant<int64_t, double, QString>;
-}
+using ValueVariant = std::variant<int64_t, double, QString>;
 
+namespace TgBot { class Bot;}
+class DataTagRegistry;
+class DataTag;
 class QJsonObject;
 
 enum class USER_TYPE {
@@ -49,8 +47,8 @@ USER_TYPE tg_user_type_from_qstring(QString type);
 
 class TGParent {
 public:
-    explicit TGParent(OPC_HELPER::OPCDataManager* opc_ptr);
-    OPC_HELPER::OPCDataManager* OPCManager() const;
+    explicit TGParent(DataTagRegistry& tag_registry_ptr);
+    const DataTagRegistry* TagManager() const;
     TgBot::Bot* Bot();
     void AddOrUpdateChatID(int64_t user, USER_TYPE type);
     void DeleteChatID(int64_t user);
@@ -64,7 +62,7 @@ public:
     void SetBotNameForChannel(QString name);
 
 private:
-    OPC_HELPER::OPCDataManager* opc_ptr_ = nullptr;
+    DataTagRegistry* tag_registry_ptr_ = nullptr;
     std::unique_ptr<TgBot::Bot> bot_ptr_;
     std::unordered_map<USER_TYPE, std::unordered_set<int64_t>> user_permission_to_chat_id_;
     std::unordered_set<int64_t> inactive_users_;
@@ -101,7 +99,7 @@ public:
     void SetText(std::string&& mes);
     const std::string& GetText() const;
     const std::string GetTextToSend() const;
-    std::vector<size_t> GetOPCTagIDs() const;
+    std::vector<size_t> GetTagIDs() const;
 
     bool HasButtons() const;
     bool HasTags() const;
@@ -123,7 +121,7 @@ protected:
     void get_tags_ptr_();
     std::list<std::string> message_parts_;
     std::unordered_map<const std::string*, size_t> segments_to_tag_id_;
-    std::unordered_map<size_t, std::shared_ptr<OPC_HELPER::OPCTag>> id_to_opc_tags_;
+    std::unordered_map<size_t, std::shared_ptr<DataTag>> id_to_data_tags_;
 };
 
 class TGTrigger: public TGObject {
@@ -138,13 +136,14 @@ public:
     void SetAuthorizationLevel(USER_TYPE type);
     USER_TYPE GetAuthorizationLevel() const;
 
-    void AddOPCTagWValue(std::shared_ptr<OPC_HELPER::OPCTag>& tag, OPC_HELPER::OpcValueType value);
-    const std::unordered_map<std::shared_ptr<OPC_HELPER::OPCTag>, OPC_HELPER::OpcValueType>& GetOpcTagsWSetValues() const;
+    void AddOPCTagWValue(size_t tag_id, ValueVariant value);
+    const std::unordered_map<size_t, ValueVariant>& GetIdTagsWSetValues() const;
     void ClearTagsToWrite();
 
 protected:
     USER_TYPE user_type_ = USER_TYPE::UNDEFINED;
-    std::unordered_map<std::shared_ptr<OPC_HELPER::OPCTag>, OPC_HELPER::OpcValueType> opc_tags_to_set_values_;
+    std::unordered_map<size_t, std::shared_ptr<DataTag>> id_to_tag_ptr_;
+    std::unordered_map<size_t, ValueVariant> id_to_tag_set_values_;
 
 private:
     std::vector<const TGMessage*> messages_;
@@ -182,20 +181,21 @@ class TGTriggerTagValue: public TGTrigger
 {
 public:
     TGTriggerTagValue(TGParent* parent): TGTrigger(parent) {}
-    void SetTagTrigger(std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr, COMPARE_TYPE type, OPC_HELPER::OpcValueType value, OPC_HELPER::OpcValueType hysterezis);
-    std::tuple<const OPC_HELPER::OPCTag*, COMPARE_TYPE, OPC_HELPER::OpcValueType, OPC_HELPER::OpcValueType> GetTagTrigger() const;
+    void SetTagTrigger(size_t id, COMPARE_TYPE type, ValueVariant value, ValueVariant hysterezis);
+    std::tuple<size_t, COMPARE_TYPE, ValueVariant, ValueVariant> GetTagTrigger() const;
     bool CheckTrigger();
     void Execute() const;
     QJsonObject SaveToJson() const override;
 
 private:
-    OPC_HELPER::OpcValueType iVal_;
-    OPC_HELPER::OpcValueType lastiVal_;
-    OPC_HELPER::OpcValueType hysterezis_;
+    ValueVariant iVal_;
+    ValueVariant lastiVal_;
+    ValueVariant hysterezis_;
     COMPARE_TYPE type_;
     bool previous_state_ = false;
     bool first_scan_ = true;
-    std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr_ = nullptr;
+    size_t tag_id_ = 0;
+    std::shared_ptr<DataTag> tag_ptr_ = nullptr;
     std::function<bool()> CheckF_ = [](){static bool b = false; return b;};
     std::function<bool()> CheckFHyst_ = [](){static bool b = false; return b;};
 };

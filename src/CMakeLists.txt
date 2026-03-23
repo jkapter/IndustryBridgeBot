@@ -42,9 +42,9 @@ set(PROJECT_SOURCES
 )
 
 qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
-    opctag.h opctag.cpp
+    # opctag.h opctag.cpp
     logger.h logger.cpp
-    opcdatamanager.h opcdatamanager.cpp
+    # opcdatamanager.h opcdatamanager.cpp
     opcclientworker.h opcclientworker.cpp
     copcclient.h copcclient.cpp
     tgobject.h tgobject.cpp
@@ -65,6 +65,10 @@ qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
     tgcommandconfigurationwidget.h tgcommandconfigurationwidget.cpp tgcommandconfigurationwidget.ui
     tginlinebuttonsconfigurationwidget.h tginlinebuttonsconfigurationwidget.cpp tginlinebuttonsconfigurationwidget.ui
     tgeventsconfigurationwidget.h tgeventsconfigurationwidget.cpp tgeventsconfigurationwidget.ui
+    datatag.h datatag.cpp
+    datatagregistry.h datatagregistry.cpp
+    sourcedrivermanager.h sourcedrivermanager.cpp
+    sourcedrivers.h sourcedrivers.cpp
 )
 
 target_link_libraries(OPCDATgBot PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)

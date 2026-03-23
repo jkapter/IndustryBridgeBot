@@ -6,8 +6,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
-#include "opcdatamanager.h"
-#include "opctag.h"
+#include "datatag.h"
+#include "datatagregistry.h"
+
+using namespace DATATAG;
 
 QString tg_user_type_to_qstring(USER_TYPE type)
 {
@@ -39,13 +41,13 @@ USER_TYPE tg_user_type_from_qstring(QString type)
 //============ T G B O T P A R E N T ============================
 //===============================================================
 
-TGParent::TGParent(OPC_HELPER::OPCDataManager* opc_ptr)
-    : opc_ptr_(opc_ptr)
+TGParent::TGParent(DataTagRegistry& tag_registry_ptr)
+    : tag_registry_ptr_(&tag_registry_ptr)
     , bot_ptr_(nullptr)
 {}
 
-OPC_HELPER::OPCDataManager* TGParent::OPCManager() const {
-    return opc_ptr_;
+const DataTagRegistry* TGParent::TagManager() const {
+    return tag_registry_ptr_;
 }
 
 TgBot::Bot* TGParent::Bot() {
@@ -238,8 +240,8 @@ const std::string TGMessage::GetTextToSend() const
     std::string message{""};
     for(const auto& it: message_parts_) {
         if(segments_to_tag_id_.count(&it)) {
-            if(id_to_opc_tags_.count(segments_to_tag_id_.at(&it))) {
-                message += id_to_opc_tags_.at(segments_to_tag_id_.at(&it))->GetStringValue().replace(".", ",").toStdString();
+            if(id_to_data_tags_.count(segments_to_tag_id_.at(&it))) {
+                message += id_to_data_tags_.at(segments_to_tag_id_.at(&it))->GetStringValue().replace(".", ",").toStdString();
             } else {
                 message += "NOT FOUND";
             }
@@ -258,7 +260,7 @@ bool TGMessage::HasButtons() const
 
 bool TGMessage::HasTags() const
 {
-    return !id_to_opc_tags_.empty();
+    return !id_to_data_tags_.empty();
 }
 
 void TGMessage::AddTGInlineButton(TGButtonWCallback* btn) {
@@ -298,7 +300,7 @@ QJsonObject TGMessage::SaveToJson() const
     }
     ret_obj.insert("inline_buttons", buttons);
     QJsonArray tags_ids;
-    for(const auto& it: GetOPCTagIDs()) {
+    for(const auto& it: GetTagIDs()) {
         tags_ids.append(static_cast<int64_t>(it));
     }
     ret_obj.insert("opc_tags", tags_ids);
@@ -350,18 +352,18 @@ void TGMessage::parse_message_() {
 }
 
 void TGMessage::get_tags_ptr_() {
-    id_to_opc_tags_.clear();
-    if(!GetTGParent()->OPCManager()) {
+    id_to_data_tags_.clear();
+    if(!GetTGParent()->TagManager()) {
         qCritical() << "Указатель на OPCManager не инициализирован!";
         return;
     }
     for(const auto& [str_ref, id]: segments_to_tag_id_) {
-        id_to_opc_tags_[id] = this->GetTGParent()->OPCManager()->GetOPCTag(id);
+        id_to_data_tags_[id] = this->GetTGParent()->TagManager()->GetTagOfId(id);
     }
 }
 
-std::vector<size_t> TGMessage::GetOPCTagIDs() const {
-    auto tags = std::views::keys(id_to_opc_tags_);
+std::vector<size_t> TGMessage::GetTagIDs() const {
+    auto tags = std::views::keys(id_to_data_tags_);
     return {tags.begin(), tags.end()};
 }
 
@@ -438,12 +440,14 @@ bool TGTriggerUserCommand::IncludedToMainMenu() const
 //==== T G T R I G G E R T A G V A L U E=============
 //===================================================
 
-OPC_HELPER::OpcValueType operator-(OPC_HELPER::OpcValueType lhs, OPC_HELPER::OpcValueType rhs);
-OPC_HELPER::OpcValueType operator+(OPC_HELPER::OpcValueType lhs, OPC_HELPER::OpcValueType rhs);
+ValueVariant DATATAG::operator-(ValueVariant lhs, ValueVariant rhs);
+ValueVariant DATATAG::operator+(ValueVariant lhs, ValueVariant rhs);
 
-void TGTriggerTagValue::SetTagTrigger(std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr, COMPARE_TYPE type, OPC_HELPER::OpcValueType value, OPC_HELPER::OpcValueType hysterezis) {
-    if(!tag_ptr) return;
-    tag_ptr_ = tag_ptr;
+void TGTriggerTagValue::SetTagTrigger(size_t id, COMPARE_TYPE type, ValueVariant value, ValueVariant hysterezis) {
+    tag_id_ = id;
+    tag_ptr_ = GetTGParent()->TagManager()->GetTagOfId(id);
+    if(!tag_ptr_) return;
+
     type_ = type;
     iVal_ = value;
     hysterezis_ = hysterezis;
@@ -464,9 +468,9 @@ void TGTriggerTagValue::SetTagTrigger(std::shared_ptr<OPC_HELPER::OPCTag> tag_pt
     };
 }
 
-std::tuple<const OPC_HELPER::OPCTag *, COMPARE_TYPE, OPC_HELPER::OpcValueType, OPC_HELPER::OpcValueType> TGTriggerTagValue::GetTagTrigger() const
+std::tuple<size_t, COMPARE_TYPE, ValueVariant, ValueVariant> TGTriggerTagValue::GetTagTrigger() const
 {
-    return {tag_ptr_.get(), type_, iVal_, hysterezis_};
+    return {tag_id_, type_, iVal_, hysterezis_};
 }
 
 bool TGTriggerTagValue::CheckTrigger() {
@@ -529,11 +533,7 @@ QJsonObject TGTriggerTagValue::SaveToJson() const
 
     ret_obj.insert("auth_level", tg_user_type_to_qstring(user_type_));
 
-    size_t tag_id = 0;
-    if(tag_ptr_ && GetTGParent()->OPCManager()) {
-        tag_id = GetTGParent()->OPCManager()->GetTagId(tag_ptr_->GetFullName());
-    }
-    ret_obj.insert("tag_id", static_cast<int64_t>(tag_id));
+    ret_obj.insert("tag_id", static_cast<int64_t>(tag_id_));
     QJsonArray messages;
     for(const auto& it: GetMessages()) {
         messages.append(QString::fromStdString(it->GetId()));
@@ -572,8 +572,8 @@ std::tuple<const std::string&, std::function<void(const TgBot::CallbackQuery::Pt
         }
 
         if(GetTGParent()->CheckUserChatId(cb_query->message->chat->id, user_type_)) {
-            for(const auto& [tag, val]: opc_tags_to_set_values_) {
-                tag->SetValueToWrite(val);
+            for(const auto& [id, val]: id_to_tag_set_values_) {
+                id_to_tag_ptr_.at(id)->SetValueToWrite(val);
             }
         } else {
             std::string mes{"У вас нет прав на запись команд"};
@@ -595,9 +595,9 @@ QJsonObject TGButtonWCallback::SaveToJson() const
     }
     ret_obj.insert("messages", messages);
     QJsonArray tags;
-    for(const auto& [tag, val]: opc_tags_to_set_values_) {
+    for(const auto& [id, val]: id_to_tag_set_values_) {
         QJsonObject obj;
-        obj.insert("tag_id", static_cast<qint64>(GetTGParent()->OPCManager()->GetTagId(tag->GetFullName())));
+        obj.insert("tag_id", static_cast<qint64>(id));
         switch(val.index()) {
         case 0: obj.insert("int_value", std::get<int64_t>(val)); break;
         case 1: obj.insert("double_value", std::get<double>(val)); break;
@@ -655,20 +655,23 @@ USER_TYPE TGTrigger::GetAuthorizationLevel() const
     return user_type_;
 }
 
-void TGTrigger::AddOPCTagWValue(std::shared_ptr<OPC_HELPER::OPCTag> &tag, OPC_HELPER::OpcValueType value)
+void TGTrigger::AddOPCTagWValue(size_t tag_id, ValueVariant value)
 {
-    if(!tag || value.valueless_by_exception()) return;
-    opc_tags_to_set_values_[tag] = value;
+    auto tag_ptr = GetTGParent()->TagManager()->GetTagOfId(tag_id);
+    if(!tag_ptr || value.valueless_by_exception()) return;
+    id_to_tag_ptr_[tag_id] = std::move(tag_ptr);
+    id_to_tag_set_values_[tag_id] = value;
 }
 
-const std::unordered_map<std::shared_ptr<OPC_HELPER::OPCTag>, OPC_HELPER::OpcValueType> &TGTrigger::GetOpcTagsWSetValues() const
+const std::unordered_map<size_t, ValueVariant> &TGTrigger::GetIdTagsWSetValues() const
 {
-    return opc_tags_to_set_values_;
+    return id_to_tag_set_values_;
 }
 
 void TGTrigger::ClearTagsToWrite()
 {
-    opc_tags_to_set_values_.clear();
+    id_to_tag_set_values_.clear();
+    id_to_tag_ptr_.clear();
 }
 
 
