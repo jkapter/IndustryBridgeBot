@@ -30,15 +30,15 @@ using namespace Qt::StringLiterals;
 
 COPCClient::COPCClient(): QObject()
 {
-    qInfo() << QString("Новый экземпляр ОРС клиента, поток [%1]").arg(QThread::currentThread()->objectName());
+    qInfo() << QString("Новый экземпляр ОРС DA клиента, поток [%1]").arg(QThread::currentThread()->objectName());
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);//COINIT_APARTMENTTHREADED);
 }
 
 COPCClient::~COPCClient() {
     clear_internal_data_();
     CoUninitialize();
-    emit sg_send_message_to_console(QString("ОРС-клиент поток [%1]: завершен.").arg(QThread::currentThread()->objectName()));
-    qInfo() << QString("Завершен ОРС клиент, поток %1").arg(QThread::currentThread()->objectName());
+    emit sg_send_message_to_console(QString("ОРС DA клиент поток [%1]: завершен.").arg(QThread::currentThread()->objectName()));
+    qInfo() << QString("Завершен ОРС DA клиент, поток %1").arg(QThread::currentThread()->objectName());
 }
 
 void COPCClient::clear_internal_data_() {
@@ -100,7 +100,7 @@ int COPCClient::get_registered_servers_(const QString& hostname)
     }
 
     if(hRes != S_OK) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка запроса списка серверов. hRes = %2 : %3")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка запроса списка серверов. hRes = %2 : %3")
                                   .arg(QThread::currentThread()->objectName())
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -115,7 +115,7 @@ int COPCClient::get_registered_servers_(const QString& hostname)
     }
 
     if(!pServerList) {
-        QString log_message = QString("ОРС-клиент поток [%1]: список серверов пуст.").arg(QThread::currentThread()->objectName());
+        QString log_message = QString("ОРС DA клиент поток [%1]: список серверов пуст.").arg(QThread::currentThread()->objectName());
         emit sg_send_message_to_console(log_message);
         qWarning() << log_message;
         return -1;
@@ -125,7 +125,7 @@ int COPCClient::get_registered_servers_(const QString& hostname)
     hRes = pServerList->EnumClassesOfCategories(1, &clsidcat, 0, NULL, &pIEnumGuid);
 
     if(hRes != S_OK) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка запроса списка классов. hRes = %2 : %3")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка запроса списка классов. hRes = %2 : %3")
                                   .arg(QThread::currentThread()->objectName())
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -135,7 +135,7 @@ int COPCClient::get_registered_servers_(const QString& hostname)
     }
 
     if(!pIEnumGuid || hRes != S_OK) {
-        QString log_message = QString("ОРС-клиент поток [%1]: список GUID серверов пуст.").arg(QThread::currentThread()->objectName());
+        QString log_message = QString("ОРС DA клиент поток [%1]: список GUID серверов пуст.").arg(QThread::currentThread()->objectName());
         emit sg_send_message_to_console(log_message);
         qWarning() << log_message;
 
@@ -192,7 +192,7 @@ bool COPCClient::browse_server_address_space_(const GUID* guid_ptr, int notify_o
     HRESULT hRes = opc_server_guid_to_IOPCSErver_.at(guid_ptr)->QueryInterface(IID_IOPCBrowseServerAddressSpace, (void**)&pBrowse);
 
     if (hRes != S_OK) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка подключения к серверу %2@%3. hRes = %4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка подключения к серверу %2@%3. hRes = %4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).ProgID, opc_server_guid_to_data_.at(guid_ptr).Hostname)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -229,7 +229,7 @@ void COPCClient::export_server_address_space_(IOPCBrowseServerAddressSpace* pPar
     HRESULT hRes = pParent->BrowseOPCItemIDs(OPC_LEAF, L"", VT_EMPTY, 0, &pEnum);
 
     if(!pEnum) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка экспорта адресного пространства сервера %2@%3 OPC_LEAF. hRes = %4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка экспорта адресного пространства сервера %2@%3 OPC_LEAF. hRes = %4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).ProgID, opc_server_guid_to_data_.at(guid_ptr).Hostname)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -260,7 +260,7 @@ void COPCClient::export_server_address_space_(IOPCBrowseServerAddressSpace* pPar
     pParent->BrowseOPCItemIDs(OPC_BRANCH, L"", VT_EMPTY, 0, &pEnum);
 
     if(!pEnum) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка экспорта адресного пространства сервера %2@%3 OPC_BRANCH. hRes = %4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка экспорта адресного пространства сервера %2@%3 OPC_BRANCH. hRes = %4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).ProgID, opc_server_guid_to_data_.at(guid_ptr).Hostname)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -316,7 +316,7 @@ bool COPCClient::connect_server_(const GUID* guid_ptr) {
     }
 
     if (hRes != S_OK) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка подключения к серверу %2@%3. hRes = 0x%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка подключения к серверу %2@%3. hRes = 0x%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -331,7 +331,7 @@ bool COPCClient::connect_server_(const GUID* guid_ptr) {
         return false;
     }
 
-    QString log_message = QString("ОРС-клиент поток [%1]: подключениe к серверу %2@%3 успешно")
+    QString log_message = QString("ОРС DA клиент поток [%1]: подключениe к серверу %2@%3 успешно")
                               .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID);
 
     emit sg_send_message_to_console(log_message);
@@ -357,7 +357,7 @@ bool COPCClient::register_group_(const GUID* guid_ptr)
     HRESULT hRes = server->AddGroup(OLESTR("OPCDATG_GROUP"), bActive, hgroup.update_rate, 1, NULL, NULL, 0, &hgroup.opc_handle_group, &hgroup.update_rate, __uuidof(IOPCItemMgt), (IUnknown**)&hgroup.pItemMgt);
 
     if (FAILED(hRes)) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка добавления группы тэгов на сервер %2@%3. hRes = 0х%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка добавления группы тэгов на сервер %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -378,7 +378,7 @@ bool COPCClient::register_group_(const GUID* guid_ptr)
     hRes = hgroup.pItemMgt->QueryInterface(IID_IOPCSYNCIO, (void**)& hgroup.pSyncIO);
 
     if(FAILED(hRes)) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка запроса интерфейса сервера %2@%3. hRes = 0х%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка запроса интерфейса сервера %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -409,7 +409,7 @@ void COPCClient::remove_group_(const GUID* guid_ptr)
                 hRes = group_handler.pItemMgt->RemoveItems(group_handler.dwCount(), item_handlers, &hErr);
 
                 if(FAILED(hRes)) {
-                    QString log_message = QString("ОРС-клиент поток [%1]: ошибка удаления элементов группы тэгов из сервера %2@%3. hRes = 0х%4 : %5")
+                    QString log_message = QString("ОРС DA клиент поток [%1]: ошибка удаления элементов группы тэгов из сервера %2@%3. hRes = 0х%4 : %5")
                                               .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                               .arg(static_cast<unsigned long>(hRes), 10, 16)
                                               .arg(GetErrorStringFromHRESULT(hRes));
@@ -427,7 +427,7 @@ void COPCClient::remove_group_(const GUID* guid_ptr)
             if(group_handler.opc_handle_group != 0) {
                 hRes = opc_server_guid_to_IOPCSErver_.at(guid_ptr)->RemoveGroup(group_handler.opc_handle_group, true);
                 if(FAILED(hRes)) {
-                    QString log_message = QString("ОРС-клиент поток [%1]: ошибка удаления группы тэгов из сервера %2. hRes = 0х%3 : %4")
+                    QString log_message = QString("ОРС DA клиент поток [%1]: ошибка удаления группы тэгов из сервера %2. hRes = 0х%3 : %4")
                                               .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                               .arg(static_cast<unsigned long>(hRes), 10, 16)
                                               .arg(GetErrorStringFromHRESULT(hRes));
@@ -458,7 +458,7 @@ void COPCClient::disconnect_server_(const GUID* guid_ptr)
         opc_server_guid_to_IOPCSErver_.at(guid_ptr)->Release();
         opc_server_guid_to_IOPCSErver_.at(guid_ptr) = NULL;
 
-        qInfo() << QString("OPC- клиент поток [%1]. Отключен от сервера %2@%3")
+        qInfo() << QString("OPC DA клиент поток [%1]. Отключен от сервера %2@%3")
                        .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID);
     }
 }
@@ -483,7 +483,7 @@ size_t COPCClient::read_server_tags_(const GUID* guid_ptr)
     HRESULT hRes = group_hnd.pSyncIO->Read(OPC_DS_DEVICE, group_hnd.dwCount(), pHandles, &pItemValue, &pErrors);
 
     if(FAILED(hRes)) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка чтения тэгов из сервера %2@%3. hRes = 0х%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка чтения тэгов из сервера %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -534,7 +534,7 @@ size_t COPCClient::write_server_tags_(const GUID* guid_ptr)
     HRESULT hRes = group_hnd.pSyncIO->Write(dwCount, pHandles, pItemValues, &pErrors);
 
     if(FAILED(hRes)) {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка записи тэгов из сервера %2@%3. hRes = 0х%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка записи тэгов из сервера %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -595,7 +595,7 @@ size_t COPCClient::add_tags_to_group_(const GUID* guid_ptr, std::vector<std::sha
             group_handler.AddTagWithHandle(tags_checked.at(i), pResults[i].hServer);
         }
     } else {
-        QString log_message = QString("ОРС-клиент поток [%1]: ошибка добавления тэгов в группу сервера %2@%3. hRes = 0х%4 : %5")
+        QString log_message = QString("ОРС DA клиент поток [%1]: ошибка добавления тэгов в группу сервера %2@%3. hRes = 0х%4 : %5")
                                   .arg(QThread::currentThread()->objectName(), opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                                   .arg(static_cast<unsigned long>(hRes), 10, 16)
                                   .arg(GetErrorStringFromHRESULT(hRes));
@@ -647,7 +647,7 @@ const std::vector<QString>& COPCClient::GetOPCTagsNames(const QString& hostname,
 
     browse_server_address_space_(guid_ptr, notify_of_portion);
 
-    QString log_message = QString("Обзор тэгов OPC сервера %1@%2: количество тэгов %3")
+    QString log_message = QString("Обзор тэгов OPC DA сервера %1@%2: количество тэгов %3")
                             .arg(opc_server_guid_to_data_.at(guid_ptr).Hostname, opc_server_guid_to_data_.at(guid_ptr).ProgID)
                             .arg(opc_server_guid_to_tag_names_.at(guid_ptr).size());
 
@@ -680,7 +680,7 @@ size_t COPCClient::AddTags(std::vector<std::shared_ptr<DataTagOpcDA>> &tags)
         if(opc_server_to_guid_.contains(&(*server_it))
             && !opc_server_guid_to_group_.at(opc_server_to_guid_.at(&(*server_it))).CheckTagExist(it)) {
 
-            tags_map_temp[opc_server_to_guid_.at(&(*server_it))].push_back(it);
+            tags_map_temp[opc_server_to_guid_.at(&(*server_it))].push_back(casted_ptr);
         }
     }
 

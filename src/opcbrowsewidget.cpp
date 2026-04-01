@@ -61,7 +61,7 @@ OpcBrowseWidget::OpcBrowseWidget(SourceDriverManager* dm_ptr, QWidget *parent)
     }
 
     for(const auto& host: host_names_) {
-        for(const auto& it: driver_manager_->OpcDaDriver()->GetServerNames(host)) {
+        for(const auto& it: driver_manager_->OpcDaDriver()->GetEndpointNames(host)) {
             auto [serv_it, b] = host_to_opc_servers_.at(&host).insert(it);
             if(b) {
                 opc_server_to_table_model_[&(*serv_it)] = nullptr;
@@ -142,12 +142,10 @@ void OpcBrowseWidget::fill_tags_list_(const QString& hostname, const QString& se
 
     if(!opc_server_to_tags_list_buffer_.contains(&(*server_it))) {
         opc_server_to_tags_list_buffer_[&(*server_it)] = {};
-        driver_manager_->OpcDaDriver()->StartBrowsingTagsNames(hostname, server_name);
         console_->sl_add_text_to_console(QString("Запрос списка тэгов сервера %1 на хосте %2.").arg(server_name, hostname));
-        return;
     }
 
-    auto tags_opt = driver_manager_->OpcDaDriver()->GetTagNames(hostname, server_name);
+    auto tags_opt = std::move(driver_manager_->OpcDaDriver()->GetTagNames(hostname, server_name));
     if(!tags_opt.has_value()) return;
 
     opc_server_to_tags_list_buffer_[&(*server_it)] = tags_opt.value();
@@ -284,7 +282,7 @@ void OpcBrowseWidget::sl_add_new_host_to_tree(const QString& hostname)
     if(b) {
 
         host_to_opc_servers_[&(*host_it)] = {};
-        for(const auto& it: driver_manager_->OpcDaDriver()->GetServerNames(hostname)) {
+        for(const auto& it: driver_manager_->OpcDaDriver()->GetEndpointNames(hostname)) {
             auto [serv_it, b] = host_to_opc_servers_.at(&(*host_it)).insert(it);
             if(b) {
                 opc_server_to_table_model_[&(*serv_it)] = nullptr;

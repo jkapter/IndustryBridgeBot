@@ -364,6 +364,17 @@ void DataTagOpcDA::SetOPCItemState(tagOPCITEMSTATE *item_state)
     opc_legacy_type_ = VARENUM(last_opc_value_.vDataValue.vt);
     data_type_ = get_type_from_opc_legacy_type_(opc_legacy_type_);
     value_ = extract_value_from_opc_struct_();
+    switch(last_opc_value_.wQuality) {
+    case 0xC0:  tag_quality_ = DataQuality::GOOD; break;
+    case 0x00:
+    case 0x04:
+    case 0x08:
+    case 0x0c:
+    case 0x10:
+    case 0x1c:
+    case 0x18:  tag_quality_ = DataQuality::BAD; break;
+    default:    tag_quality_ = DataQuality::UNCERTAIN; break;
+    }
 }
 
 WORD DataTagOpcDA::GetOpcDaQuality() const

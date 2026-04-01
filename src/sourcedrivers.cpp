@@ -1,12 +1,15 @@
 #include "sourcedrivers.h"
 
+#include <QOpcUaProvider>
 #include <QThread>
 #include <QTimer>
 
 #include "opcclientworker.h"
 #include "copcclient.h"
 
-OPCDADriver::OPCDADriver(QObject *parent)
+using namespace Qt::StringLiterals;
+
+OPCDADriver::OPCDADriver(QObject *parent): QObject(parent)
 {}
 
 OPCDADriver::~OPCDADriver()
@@ -24,10 +27,10 @@ OPCDADriver::~OPCDADriver()
         }
     }
 
-    qInfo() << "OPCDADriver деструктор завершен.";
+    qInfo() << u"OPCDADriver деструктор завершен."_s;
 }
 
-std::set<QString> OPCDADriver::GetServerNames(const QString &host)
+std::set<QString> OPCDADriver::GetEndpointNames(const QString &host)
 {
     if(host_to_servers_.contains(host)) return host_to_servers_.at(host);
     OPC_HELPER::COPCClient client;
@@ -36,10 +39,10 @@ std::set<QString> OPCDADriver::GetServerNames(const QString &host)
     return host_to_servers_.at(host);
 }
 
-void OPCDADriver::StartBrowsingTagsNames(const QString &hostname, const QString &server_name)
+void OPCDADriver::start_browsing_tags_names_(const QString &hostname, const QString &server_name)
 {
     if(!host_to_servers_.contains(hostname)) {
-        GetServerNames(hostname);
+        GetEndpointNames(hostname);
     }
 
     if(!host_to_servers_.contains(hostname)) return;
@@ -82,7 +85,13 @@ std::optional<const std::vector<QString>> OPCDADriver::GetTagNames(const QString
     auto server_it = host_to_servers_.at(hostname).find(server_name);
     if(server_it == host_to_servers_.at(hostname).end()) return std::nullopt;;
 
-    if(!server_to_tag_names_.contains(&(*server_it)) || !server_tags_is_browsing_.contains(&(*server_it)) || server_tags_is_browsing_.at(&(*server_it))) return std::nullopt;
+    if(!server_to_tag_names_.contains(&(*server_it))) {
+        start_browsing_tags_names_(hostname, server_name);
+    }
+
+    if(!server_to_tag_names_.contains(&(*server_it)) || !server_tags_is_browsing_.contains(&(*server_it)) || server_tags_is_browsing_.at(&(*server_it))) {
+        return std::nullopt;
+    }
 
     return server_to_tag_names_.at(&(*server_it));
 }
@@ -224,13 +233,13 @@ void OPCDADriver::sl_thread_send_opc_status(QString host, QString server, size_t
 {
     QString ser_state;
     switch(server_state) {
-    case OPC_STATUS_RUNNING: ser_state = "OPC_STATUS_RUNNING"; break;
-    case OPC_STATUS_FAILED: ser_state = "OPC_STATUS_FAILED"; break;
-    case OPC_STATUS_NOCONFIG: ser_state = "OPC_STATUS_NOCONFIG"; break;
-    case OPC_STATUS_SUSPENDED: ser_state = "OPC_STATUS_SUSPENDED"; break;
-    case OPC_STATUS_TEST: ser_state = "OPC_STATUS_TEST"; break;
-    case OPC_STATUS_COMM_FAULT:	ser_state = "OPC_STATUS_COMM_FAULT"; break;
-    default: ser_state = "UNKNOWN"; break;
+    case OPC_STATUS_RUNNING: ser_state = u"OPC_STATUS_RUNNING"_s; break;
+    case OPC_STATUS_FAILED: ser_state = u"OPC_STATUS_FAILED"_s; break;
+    case OPC_STATUS_NOCONFIG: ser_state = u"OPC_STATUS_NOCONFIG"_s; break;
+    case OPC_STATUS_SUSPENDED: ser_state = u"OPC_STATUS_SUSPENDED"_s; break;
+    case OPC_STATUS_TEST: ser_state = u"OPC_STATUS_TEST"_s; break;
+    case OPC_STATUS_COMM_FAULT:	ser_state = u"OPC_STATUS_COMM_FAULT"_s; break;
+    default: ser_state = u"UNKNOWN"_s; break;
     }
 
     QString log_message = QString("OPCDADriver: сервер %1@%2 получено состояние %3").arg(host, server, ser_state);
@@ -277,4 +286,57 @@ void OPCDADriver::sl_get_all_tag_names_from_server(const QString& hostname, cons
     if(server_it == host_to_servers_.at(hostname).end()) return;
 
     if(server_tags_is_browsing_.contains(&(*server_it))) server_tags_is_browsing_.at(&(*server_it)) = false;
+}
+
+//===================================================================
+//====================== OPCUADriver ================================
+//===================================================================
+
+std::set<QString> OPCUADriver::GetEndpointNames(const QString &host)
+{
+    if(!ua_client_) {
+        QOpcUaProvider provider;
+        if (provider.availableBackends().isEmpty()) {
+            qCritical() << u"Opc UA Driver: No available backends!"_s;
+            return {};
+        }
+        ua_client_.reset(provider.createClient(provider.availableBackends().at(0)));
+    }
+
+    if(!ua_client_) {
+        qCritical() << u"Opc UA Driver: не удалось инициализировать клиента."_s;
+        return {};
+    }
+
+    if(host_to_endpoints_.contains(host)) {
+        std::set<QString> ret_set;
+        for(const auto& ep: host_to_endpoints_.at(host)) {
+            ret_set.insert(endpoint_to_text_(ep));
+        }
+        return ret_set;
+    }
+
+    QObject::connect(ua_client_, &QOpcUaClient::endpointsRequestFinished,
+                     [this](QList<QOpcUaEndpointDescription> endpoints) {
+                         qInfo() << u"Opc UA Driver: Endpoints returned:" << endpoints.count();
+                         for(const auto& it: endpoints) {
+                             qDebug() << "Url: " << it.endpointUrl() << " Policy: " << it.securityPolicy();
+                         }
+                         if (endpoints.size()>1)
+                             ua_client_->connectToEndpoint(endpoints[1]); // Connect to the first endpoint in the list
+                     });
+
+}
+
+QString OPCUADriver::endpoint_to_text_(const QOpcUaEndpointDescription &ep_description)
+{
+    QString ret_str = QString("Url: %1").arg(ep_description.endpointUrl());
+    QString security_str = u" Security: "_s;
+    switch (ep_description.securityLevel()) {
+    case QOpcUaEndpointDescription::None: security_str.append(u"None"_s); break;
+    case QOpcUaEndpointDescription::Sign: security_str.append(u"Sign"_s); break;
+    case QOpcUaEndpointDescription::SignAndEncrypt: security_str.append(u"SignAndEncrypt"_s); break;
+    default: security_str.append(u"Invalid"_s); break;
+    }
+    return ret_str.append(security_str);
 }

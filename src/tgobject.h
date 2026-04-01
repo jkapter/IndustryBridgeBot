@@ -8,6 +8,7 @@
 #include <ranges>
 #include <list>
 #include <variant>
+#include <atomic>
 
 #include <QString>
 #include <QDate>
@@ -17,6 +18,7 @@
 #include "tgbot/types/InlineKeyboardMarkup.h"
 #include "tgbot/types/InlineKeyboardButton.h"
 #include "tgbot/types/CallbackQuery.h"
+#include "tgbot/net/CurlHttpClient.h"
 
 using ValueVariant = std::variant<int64_t, double, QString>;
 
@@ -25,7 +27,7 @@ class DataTagRegistry;
 class DataTag;
 class QJsonObject;
 
-enum class USER_TYPE {
+enum class USER_TYPE: uint8_t {
     UNDEFINED       = 0,
     NEW_USER        = 1,
     UNREGISTERED    = 2,
@@ -45,16 +47,34 @@ enum class TGOBJECT_TYPE {
 QString tg_user_type_to_qstring(USER_TYPE type);
 USER_TYPE tg_user_type_from_qstring(QString type);
 
+class InterruptibleHttpClient: public TgBot::CurlHttpClient
+{
+public:
+    void RequestInterrupt() {interrupted_.store(true);}
+    void ResetInterrupt() {interrupted_.store(false);}
+
+    std::string makeRequest(const TgBot::Url& url, const std::vector<TgBot::HttpReqArg>& args) const override
+    {
+        if(interrupted_.load()) {
+            throw std::runtime_error("Http client: bot request interrupted.");
+        }
+        return TgBot::CurlHttpClient::makeRequest(url, args);
+    }
+
+private:
+    std::atomic<bool> interrupted_{false};
+};
+
 class TGParent {
 public:
     explicit TGParent(DataTagRegistry& tag_registry_ptr);
     const DataTagRegistry* TagManager() const;
     TgBot::Bot* Bot();
+    void InterruptBotHttpClient();
     void AddOrUpdateChatID(int64_t user, USER_TYPE type);
     void DeleteChatID(int64_t user);
     void ClearChatIdData();
     void InitializeBot(const std::string& token);
-    void ResetTgBotPtr();
     std::vector<int64_t> GetChatIDs(USER_TYPE min_auth_level = USER_TYPE::UNDEFINED) const;
     bool CheckUserChatId(int64_t chat_id, USER_TYPE min_auth_level) const;
     void BotSendMessage(int64_t chat_id, const std::string& text, TgBot::InlineKeyboardMarkup::Ptr inline_buttons = nullptr);
@@ -64,6 +84,7 @@ public:
 private:
     DataTagRegistry* tag_registry_ptr_ = nullptr;
     std::unique_ptr<TgBot::Bot> bot_ptr_;
+    std::unique_ptr<InterruptibleHttpClient> http_client_;
     std::unordered_map<USER_TYPE, std::unordered_set<int64_t>> user_permission_to_chat_id_;
     std::unordered_set<int64_t> inactive_users_;
     std::optional<QString> bot_name_for_channel_;

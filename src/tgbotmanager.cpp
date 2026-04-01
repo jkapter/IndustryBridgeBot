@@ -170,7 +170,7 @@ TgBotManager::TgBotManager(SourceDriverManager& dm)
 
 TgBotManager::~TgBotManager() {
     emit sg_stop_bot_thread();
-    while(bot_started_) {
+    while(bot_started_ || bot_trying_connect_api_) {
         QThread::currentThread()->eventDispatcher()->processEvents(QEventLoop::AllEvents);
     };
 
@@ -717,11 +717,8 @@ void TgBotManager::make_opc_communication_event_()
     }
 }
 
-bool TgBotManager::BotIsWorking() const {
-    return bot_started_;
-}
-
-void TgBotManager::initialize_bot_() {
+void TgBotManager::make_new_bot_()
+{
     if(bot_started_) {
         emit sg_stop_bot_thread();
         while(bot_started_) {
@@ -730,6 +727,16 @@ void TgBotManager::initialize_bot_() {
     }
 
     tg_parent_->InitializeBot(bot_token_);
+}
+
+bool TgBotManager::BotIsWorking() const {
+    return bot_started_;
+}
+
+void TgBotManager::initialize_bot_() {
+
+    if(!tg_parent_->Bot()) return;
+
     for(const auto& [id, user]: users_) {
         tg_parent_->AddOrUpdateChatID(user.chatId, user.type);
     }
@@ -748,7 +755,6 @@ void TgBotManager::initialize_bot_() {
 
     } catch (std::exception &e) {
         sl_bot_throw_exception(e.what());
-        tg_parent_->ResetTgBotPtr();
         return;
     }
 
@@ -759,6 +765,33 @@ void TgBotManager::initialize_bot_() {
 
 void TgBotManager::StartBot() {
 
+    make_new_bot_();
+
+    if(tg_parent_->Bot()) {
+        QThread* bot_thread = new QThread(this);
+        TgBotWorker* bot_worker = new TgBotWorker(tg_parent_->Bot());
+        QObject::connect(bot_thread, &QThread::started, bot_worker, &TgBotWorker::sl_try_to_connect_api);
+        QObject::connect(bot_worker, &TgBotWorker::sg_emit_text_message, this, &TgBotManager::sg_send_message_to_console);
+        QObject::connect(bot_worker, &TgBotWorker::sg_emit_exception, this, &TgBotManager::sl_bot_throw_exception);
+        QObject::connect(bot_worker, &TgBotWorker::sg_try_connection_ok, bot_thread, &QThread::quit);
+        QObject::connect(bot_worker, &TgBotWorker::sg_try_connection_fail, bot_thread, &QThread::quit);
+        QObject::connect(bot_worker, &TgBotWorker::sg_try_connection_ok, this, &TgBotManager::sl_try_to_connect_api_successful);
+        QObject::connect(bot_thread, &QThread::finished, this, [this](){bot_trying_connect_api_ = false;});
+        QObject::connect(bot_thread, &QThread::finished, bot_thread, &QObject::deleteLater, Qt::QueuedConnection);
+        QObject::connect(this, &TgBotManager::sg_stop_bot_thread, bot_worker, &TgBotWorker::sl_stop_bot);
+        QObject::connect(this, &TgBotManager::sg_stop_bot_thread, this, [this]{tg_parent_->InterruptBotHttpClient();});
+        QObject::connect(bot_thread, &QThread::finished, [bot_worker] {delete bot_worker;});
+
+        bot_trying_connect_api_ = true;
+
+        bot_worker->moveToThread(bot_thread);
+        bot_thread->start();
+    }
+}
+
+void TgBotManager::sl_try_to_connect_api_successful()
+{
+    bot_trying_connect_api_ = false;
     initialize_bot_();
 
     if(tg_parent_->Bot()) {
@@ -780,12 +813,9 @@ void TgBotManager::StartBot() {
 
         bot_worker->moveToThread(bot_thread);
         bot_thread->start();
-
-        /*if(tg_parent_ && !tg_parent_->OPCManager()->PeriodicReadingOn()) {
-            tg_parent_->OPCManager()->StartPeriodReading();
-        }*/
     }
 }
+
 
 void TgBotManager::StopBot() {
     emit sg_stop_bot_thread();
@@ -864,7 +894,7 @@ void TgBotManager::sl_check_events_timer_out()
 }
 
 void TgBotManager::sl_check_restart_timer_out() {
-    if(bot_started_) {
+    if(bot_started_ || bot_trying_connect_api_) {
         return;
     }
 

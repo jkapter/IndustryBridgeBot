@@ -121,12 +121,14 @@ private slots:
     void sl_bot_throw_exception(QString what);
     void sl_check_events_timer_out();
     void sl_check_restart_timer_out();
+    void sl_try_to_connect_api_successful();
 
 private:
     std::string bot_token_;
 
     bool auto_restart_bot_ = false;
     bool bot_started_ = false;
+    bool bot_trying_connect_api_ = false;
 
     SourceDriverManager* driver_manager_;
 
@@ -143,6 +145,7 @@ private:
     const int RESTART_BOT_PERIOD_ = 10000;
     const int TIME_TO_RESTART_APP_ON_COMM_FAIL_ = 150;
     const std::string screened_symbols_= ".=-()";
+
 
     std::unordered_map<int64_t, TgBotUser> users_;
 
@@ -166,6 +169,7 @@ private:
     void make_commands_processing_();
     void make_callback_data_();
     void make_opc_communication_event_();
+    void make_new_bot_();
     void initialize_bot_();
     bool save_user_data_to_file_(const QString& filename) const;
     bool save_tg_data_to_file_(const QString& filename) const;

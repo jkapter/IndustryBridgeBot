@@ -2,6 +2,9 @@
 #define SOURCEDRIVERS_H
 
 #include <QObject>
+#include <QOpcUaClient>
+#include <QList>
+#include <QOpcUaEndpointDescription>
 
 #include "datatag.h"
 
@@ -11,8 +14,7 @@ class OPCDADriver : public QObject
 public:
     explicit OPCDADriver(QObject *parent = nullptr);
     ~OPCDADriver();
-    std::set<QString> GetServerNames(const QString& host);
-    void StartBrowsingTagsNames(const QString& hostname, const QString& server_name);
+    std::set<QString> GetEndpointNames(const QString& host);
     std::optional<const std::vector<QString>> GetTagNames(const QString &hostname, const QString &server_name);
     size_t SetTagsList(std::vector<std::shared_ptr<DataTag>>&& tags);
     void ReadTagsOnce(std::vector<std::shared_ptr<DataTag>>& tags);
@@ -52,6 +54,8 @@ private:
     int errors_server_status_periodic_count_ = 0;
     int opc_period_reading_ = 2;
 
+    void start_browsing_tags_names_(const QString& hostname, const QString& server_name);
+
     std::vector<std::shared_ptr<DataTag>> tags_to_read_;
     std::unordered_map<QString, std::set<QString>> host_to_servers_;
     std::unordered_map<const QString*, std::vector<QString>> server_to_tag_names_;
@@ -62,7 +66,8 @@ class OPCUADriver : public QObject
 {
     Q_OBJECT
 public:
-    OPCUADriver() = default;
+    explicit OPCUADriver(QObject *parent = nullptr): QObject(parent) {}
+    std::set<QString> GetEndpointNames(const QString& host);
     bool PeriodicReadingOn() const {return false;}
     bool HasTagsToRead() const {return false;}
     void ReadTagsOnce(std::vector<std::shared_ptr<DataTag>>& tags) {;}
@@ -76,5 +81,12 @@ signals:
     void sg_reading_periodic_complete(size_t);
     void sg_send_message_to_console(QString);
 
+private slots:
+
+private:
+    std::unique_ptr<QOpcUaClient> ua_client_ = nullptr;
+    std::unordered_map<QString, QList<QOpcUaEndpointDescription>> host_to_endpoints_;
+
+    QString endpoint_to_text_(const QOpcUaEndpointDescription& ep_description);
 };
 #endif // SOURCEDRIVERS_H

@@ -58,8 +58,8 @@ bool DataTagRegistry::restore_data_tag_(size_t id, std::shared_ptr<DataTag> tag)
     id_tag_to_opc_da_tag_pointer_[id] = std::move(tag);
 
     auto host_it = hostnames_.insert(host).first;
-    auto server_it = hostname_to_servers_.at(&(*host_it)).insert(server).first;
-    auto tag_it = servers_to_tags_.at(&(*server_it)).insert(tag_name).first;
+    auto server_it = hostname_to_servers_[&(*host_it)].insert(server).first;
+    auto tag_it = servers_to_tags_[&(*server_it)].insert(tag_name).first;
 
     tag_name_to_id_[&(*tag_it)] = id;
     return true;
@@ -73,11 +73,11 @@ size_t DataTagRegistry::AddDataTag(std::shared_ptr<DataTag> tag)
     QString tag_name = tag->GetTagName();
 
     auto checked_id = check_tag_(tag);
-    if(!checked_id.has_value()) return checked_id.value();
+    if(checked_id.has_value()) return checked_id.value();
 
     auto host_it = hostnames_.insert(host).first;
-    auto server_it = hostname_to_servers_.at(&(*host_it)).insert(server).first;
-    auto tag_it = servers_to_tags_.at(&(*server_it)).insert(tag_name).first;
+    auto server_it = hostname_to_servers_[&(*host_it)].insert(server).first;
+    auto tag_it = servers_to_tags_[&(*server_it)].insert(tag_name).first;
 
     tag_name_to_id_[&(*tag_it)] = ++last_id;
     all_owned_ids_.insert(last_id);
@@ -93,7 +93,12 @@ size_t DataTagRegistry::AddDataTag(DataTag::DataSource src, const QString &fulln
     QRegularExpressionMatch match = fullname_regexp_.match(fullname);
     if(!match.hasMatch()) return 0;
 
-    std::shared_ptr<DataTag> new_tag = std::make_shared<DataTag>(src, match.captured(1), match.captured(2), match.captured(3));
+    std::shared_ptr<DataTag> new_tag;
+    switch(src) {
+    case DataTag::DataSource::OPCDA:    new_tag = std::make_shared<DataTagOpcDA>(match.captured(1), match.captured(2), match.captured(3)); break;
+    case DataTag::DataSource::OPCUA:    new_tag = std::make_shared<DataTagOpcUA>(match.captured(1), match.captured(2), match.captured(3)); break;
+    default:                            new_tag = nullptr;
+    }
 
     return AddDataTag(std::move(new_tag));
 }
@@ -131,7 +136,6 @@ bool DataTagRegistry::SaveDataToFile(const QString &folderpath)
     if(file.open(QIODeviceBase::WriteOnly)) {
         QJsonArray json_ar;
         for(const auto& [host_ptr, server_set]: hostname_to_servers_) {
-            QJsonArray servers_ar;
             for(const auto& server_it: server_set) {
                 QJsonObject server_obj;
                 QJsonArray tags_array;
@@ -145,9 +149,8 @@ bool DataTagRegistry::SaveDataToFile(const QString &folderpath)
                     tags_array.push_back(std::move(tag_json));
                 }
                 server_obj.insert("tags", tags_array);
-                servers_ar.append(std::move(server_obj));
+                json_ar.append(std::move(server_obj));
             }
-            json_ar.append(std::move(servers_ar));
         }
 
         QJsonDocument json_doc(json_ar);

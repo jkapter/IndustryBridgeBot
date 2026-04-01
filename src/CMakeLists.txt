@@ -1,38 +1,57 @@
-set(HOME FALSE)
-set(GARDEN FALSE)
+cmake_minimum_required(VERSION 3.16)
+project(OPCDATgBot VERSION 1.4 LANGUAGES CXX)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wunknown-pragmas")
-set(Boost_USE_MULTITHREADED ON)
-set(OPENSSL_ROOT_DIR "C:/Qt/Tools/mingw1310_64/opt")
-set(OLELIB "-lole32")
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(HOME)
-    set(Boost_ROOT "C:/dev/boost_1_87_0")
-    set(CURL_LIBRARY "C:/dev/curl-8.12.1_1-win64-mingw")
-    set(opc_system_path "C:/Program Files (x86)/Common Files/OPC Foundation/Include")
-elseif(GARDEN)
-    set(OPENSSL_ROOT_DIR "C:/Qt/Tools/mingw1310_64/opt")
-    set(CURL_LIBRARY "C:/dev/curl-8.11.0")
-    set(CURL_INCLUDE_DIR "C:/dev/curl-8.11.0/include")
-    set(opc_system_path "C:/Program Files (x86)/Common Files/OPC Foundation/Include")
-else()
-    set(Boost_ROOT "C:/dev/boost_1_90_0")
-    set(CURL_LIBRARY "C:/dev/curl-8.11.0")
-    set(CURL_INCLUDE_DIR "C:/dev/curl-8.11.0/include")
-    set(app_icon_resource_windows "../img/opcdabot.rc")
-    set(opc_system_path "../OPC_Foundation/Include")
-endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unknown-pragmas")
 
+add_definitions(-D_WIN32_WINNT=0x0A00)
+add_definitions(-DWIN32_LEAN_AND_MEAN)
+add_definitions(-DNOMINMAX)
+add_definitions(-DBOOST_ASIO_ENABLE_OLD_SERVICES)
+add_definitions(-DHAVE_CURL)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets OpcUa)
+
+set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party")
+set(OPC_INCLUDE_DIR   "${CMAKE_CURRENT_SOURCE_DIR}/../OPC_Foundation/Include")
+
+set(TgBot_DIR "${THIRD_PARTY_DIR}/tgbot/lib/cmake/TgBot")
+find_package(TgBot REQUIRED)
+
+set(OPENSSL_ROOT_DIR       "${THIRD_PARTY_DIR}/openssl")
+set(OPENSSL_INCLUDE_DIR    "${THIRD_PARTY_DIR}/openssl/include")
+set(OPENSSL_SSL_LIBRARY    "${THIRD_PARTY_DIR}/openssl/lib/libssl.dll.a")
+set(OPENSSL_CRYPTO_LIBRARY "${THIRD_PARTY_DIR}/openssl/lib/libcrypto.dll.a")
+find_package(OpenSSL REQUIRED)
+
+set(ZLIB_INCLUDE_DIR "${THIRD_PARTY_DIR}/zlib/include")
+set(ZLIB_LIBRARY     "${THIRD_PARTY_DIR}/zlib/lib/libz.a")
+find_package(ZLIB REQUIRED)
+
+set(CURL_INCLUDE_DIR "${THIRD_PARTY_DIR}/curl/include")
+set(CURL_LIBRARY     "${THIRD_PARTY_DIR}/curl/lib/libcurl.a")
+find_package(CURL 7.58.0 REQUIRED)
+
+set(BOOST_ROOT "C:/dev/boost_1_90_0")
+find_package(Boost REQUIRED)
 
 find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
-find_package(Boost CONFIG)
-find_package(Boost REQUIRED)
-find_package(CURL)
 
-add_compile_options(-Wno-unknown-pragmas)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${OPENSSL_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${opc_system_path})
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${OPC_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
+    ${CURL_INCLUDE_DIRS}
+    "${THIRD_PARTY_DIR}/tgbot/include"
+    ${BOOST_ROOT}
+)
 
 set(PROJECT_SOURCES
         main.cpp
@@ -69,23 +88,35 @@ qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
     datatagregistry.h datatagregistry.cpp
     sourcedrivermanager.h sourcedrivermanager.cpp
     sourcedrivers.h sourcedrivers.cpp
+    copcuaclient.h copcuaclient.cpp
 )
 
-target_link_libraries(OPCDATgBot PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
-target_link_libraries(OPCDATgBot PUBLIC TgBot ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES})
+target_link_libraries(OPCDATgBot PRIVATE
+    TgBot::TgBot
+    Qt6::Widgets
+    Qt6::OpcUa
+    ${CURL_LIBRARIES}
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ZLIB::ZLIB
+    ${CMAKE_THREAD_LIBS_INIT}
+    ws2_32
+    wldap32
+    crypt32
+    normaliz
+    ole32
+    oleaut32
+    uuid
+)
+
 
 set_target_properties(OPCDATgBot PROPERTIES
-    ${BUNDLE_ID_OPTION}
-    WIN64_EXECUTABLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
-set(CMAKE_CXX_STANDARD_LIBRARIES "-static-libgcc -static-libstdc++ -lws2_32 -luuid ${OLELIB} ${CMAKE_CSS_STANDARD_LIBRARIES}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-L${CMAKE_SOURCE_DIR}/lib/ -Wl,-Bstatic,--whole-archive -lwinpthread-rc -Wl,--no-whole-archive")
-
-if((NOT HOME) AND (NOT GARDEN) AND NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-add_custom_command(TARGET OPCDATgBot POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_SOURCE_DIR}/bin/OPCDATgBot.exe"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:OPCDATgBot>" "${CMAKE_SOURCE_DIR}/bin/"
-)
+if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+    add_custom_command(TARGET OPCDATgBot POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_SOURCE_DIR}/bin/OPCDATgBot.exe"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:OPCDATgBot>" "${CMAKE_SOURCE_DIR}/bin/"
+    )
 endif()

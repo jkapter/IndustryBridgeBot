@@ -44,6 +44,7 @@ USER_TYPE tg_user_type_from_qstring(QString type)
 TGParent::TGParent(DataTagRegistry& tag_registry_ptr)
     : tag_registry_ptr_(&tag_registry_ptr)
     , bot_ptr_(nullptr)
+    , http_client_(nullptr)
 {}
 
 const DataTagRegistry* TGParent::TagManager() const {
@@ -52,6 +53,11 @@ const DataTagRegistry* TGParent::TagManager() const {
 
 TgBot::Bot* TGParent::Bot() {
     return bot_ptr_.get();
+}
+
+void TGParent::InterruptBotHttpClient()
+{
+    http_client_->RequestInterrupt();
 }
 
 void TGParent::AddOrUpdateChatID(int64_t user, USER_TYPE type) {
@@ -75,15 +81,11 @@ void TGParent::ClearChatIdData()
     inactive_users_.clear();
 }
 
-void TGParent::ResetTgBotPtr()
-{
-    bot_ptr_.reset(nullptr);
-    ClearChatIdData();
-}
-
 void TGParent::InitializeBot(const std::string& token)
 {
-    bot_ptr_ = std::make_unique<TgBot::Bot>(token);
+    http_client_ = std::make_unique<InterruptibleHttpClient>();
+    http_client_->ResetInterrupt();
+    bot_ptr_ = std::make_unique<TgBot::Bot>(token, *http_client_);
     ClearChatIdData();
 }
 
