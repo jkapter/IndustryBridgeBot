@@ -23,11 +23,11 @@ HintInputDialog::HintInputDialog(QString help_text, QWidget* parent): QDialog(pa
     }
 
     QPushButton* okBtn = new QPushButton("OK");
-    connect(okBtn, SIGNAL(clicked()),SLOT(sl_accepted()));
+    connect(okBtn, &QAbstractButton::clicked,this, &HintInputDialog::sl_accepted);
     layout->addWidget(okBtn);
 
     QPushButton* cancelBtn = new QPushButton("Cancel");
-    connect(cancelBtn, SIGNAL(clicked()), SLOT(sl_canceled()));
+    connect(cancelBtn, &QAbstractButton::clicked, this, &HintInputDialog::sl_canceled);
     layout->addWidget(cancelBtn);
 
     setLayout(layout);

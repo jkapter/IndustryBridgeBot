@@ -10,8 +10,8 @@ OPCTagPostProcessingWidget::OPCTagPostProcessingWidget(std::shared_ptr<DataTag> 
 {
     ui->setupUi(this);
 
-    QObject::connect(ui->pbCancel, SIGNAL(clicked()), this, SLOT(close()));
-    QObject::connect(ui->pbOK, SIGNAL(clicked(bool)), this, SLOT(sl_pb_ok_clicked()));
+    QObject::connect(ui->pbCancel, &QAbstractButton::clicked, this, &QWidget::close);
+    QObject::connect(ui->pbOK, &QAbstractButton::clicked, this, &OPCTagPostProcessingWidget::sl_pb_ok_clicked);
 
     auto tag_gain = tag_->GetGainOption();
     if(tag_gain.has_value()) {
@@ -38,7 +38,7 @@ OPCTagPostProcessingWidget::OPCTagPostProcessingWidget(std::shared_ptr<DataTag> 
         ++i;
     }
 
-    QObject::connect(ui->twSubstituteValue, SIGNAL(cellClicked(int,int)), this, SLOT(sl_table_cell_changed(int,int)));
+    QObject::connect(ui->twSubstituteValue, &QTableWidget::cellClicked, this, &OPCTagPostProcessingWidget::sl_table_cell_changed);
 }
 
 OPCTagPostProcessingWidget::~OPCTagPostProcessingWidget()

@@ -2,6 +2,9 @@
 
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QStringView>
+
+#include <queue>
 
 using namespace Qt::StringLiterals;
 
@@ -101,7 +104,7 @@ DataTag::DataTag(DataSource src, const QString& host, const QString& endpoint, c
     , comment_(QString("[%1][%2]").arg(u"localhost"_s, endpoint))
     , hostname_(host)
     , endpoint_name_(endpoint)
-    , tag_name_(tagname)
+    , tag_id_(tagname)
     , tag_quality_(DataTag::DataQuality::BAD)
 {}
 
@@ -117,12 +120,12 @@ const QString &DataTag::GetHostName() const
 
 const QString &DataTag::GetTagName() const
 {
-    return tag_name_;
+    return tag_id_;
 }
 
 QString DataTag::GetFullTagDescription() const
 {
-    return QString("[%1][%2][%3]").arg(hostname_, endpoint_name_, tag_name_);
+    return QString("[%1][%2][%3]").arg(hostname_, endpoint_name_, tag_id_);
 }
 
 QString DataTag::GetStringType()
@@ -155,10 +158,26 @@ QString DataTag::GetStringValue(bool use_substitute_values)
     QString ret_str;
     if(data_type_ == DataType::UNKNOWN) return ret_str;
     if(data_type_ == DataType::UNSUPPORTED) return value_.canConvert<QString>() ? value_.toString() : ret_str;
-    if(ValueIsBool()) {
+
+    switch(data_type_) {
+    case DataType::BOOLEAN:
         ret_str = value_.toBool() ? "ДА" : "НЕТ";
-    } else {
+        break;
+    case DataType::INT1:
+    case DataType::INT2:
+    case DataType::INT4:
+    case DataType::INT8:
+        ret_str = QString::number(value_.toLongLong());
+        break;
+    case DataType::UINT1:
+    case DataType::UINT2:
+    case DataType::UINT4:
+    case DataType::UINT8:
+        ret_str = QString::number(value_.toULongLong());
+        break;
+    default:
         ret_str = value_.toString();
+        break;
     }
 
     if(use_substitute_values && substitute_values_.contains(ret_str)) ret_str = substitute_values_.at(ret_str);
@@ -167,7 +186,6 @@ QString DataTag::GetStringValue(bool use_substitute_values)
 
 ValueVariant DataTag::GetValue(bool use_substitute_values)
 {
-    QMutexLocker locker(&mtx_);
     if(ValueIsBool()) return static_cast<int64_t>(value_.toBool());
     if(ValueIsInteger()) return static_cast<int64_t>(value_.toLongLong());
     if(ValueIsUnsignedInteger()) return value_.toLongLong() < std::numeric_limits<int64_t>::max() ? static_cast<int64_t>(value_.toLongLong()) : std::numeric_limits<int64_t>::max();
@@ -191,46 +209,57 @@ const QString &DataTag::GetEndpointName() const
     return endpoint_name_;
 }
 
+const QString &DataTag::GetTagId() const
+{
+    return tag_id_;
+}
+
 DataTag::DataQuality DataTag::GetTagQuality()
 {
     QMutexLocker locker(&mtx_);
     return tag_quality_;
 }
 
-bool DataTag::TagQualityIsGood() const
+bool DataTag::TagQualityIsGood()
 {
+    QMutexLocker locker(&mtx_);
     return tag_quality_ == DataTag::DataQuality::GOOD;
 }
 
-bool DataTag::ValueIsInteger() const
+bool DataTag::ValueIsInteger()
 {
+    QMutexLocker locker(&mtx_);
     return data_type_ == DataType::INT1
             || data_type_ == DataType::INT2
             || data_type_ == DataType::INT4
             || data_type_ == DataType::INT8;
 }
 
-bool DataTag::ValueIsReal() const
+bool DataTag::ValueIsReal()
 {
+    QMutexLocker locker(&mtx_);
     return data_type_ == DataType::FLOAT4
            || data_type_ == DataType::REAL8;
 }
 
-bool DataTag::ValueIsUnsignedInteger() const
+bool DataTag::ValueIsUnsignedInteger()
 {
+    QMutexLocker locker(&mtx_);
     return data_type_ == DataType::UINT1
            || data_type_ == DataType::UINT2
            || data_type_ == DataType::UINT4
            || data_type_ == DataType::UINT8;
 }
 
-bool DataTag::ValueIsString() const
+bool DataTag::ValueIsString()
 {
+    QMutexLocker locker(&mtx_);
     return data_type_ == DataType::WSTRING;
 }
 
-bool DataTag::ValueIsBool() const
+bool DataTag::ValueIsBool()
 {
+    QMutexLocker locker(&mtx_);
     return data_type_ == DataType::BOOLEAN;
 }
 
@@ -283,6 +312,7 @@ void DataTag::SetValueToWrite(ValueVariant val)
 
 void DataTag::ResetValueToWrite()
 {
+    QMutexLocker locker(&mtx_);
     value_to_write_.clear();
 }
 
@@ -293,6 +323,7 @@ void DataTag::AddSubstituteStringValue(const QString &raw_value, const QString &
 
 const std::unordered_map<QString, QString> &DataTag::GetSubstituteStringValues() const
 {
+
     return substitute_values_;
 }
 
@@ -304,7 +335,7 @@ void DataTag::ClearSubstituteStringValues()
 QJsonObject DataTag::TagToJson(bool full_info) const
 {
     QJsonObject ret_obj;
-    ret_obj.insert("tag_name", tag_name_);
+    ret_obj.insert("tag_id", tag_id_);
     ret_obj.insert("tag_comment", comment_);
     if(full_info) {
         ret_obj.insert("server", endpoint_name_);
@@ -332,164 +363,259 @@ QJsonObject DataTag::TagToJson(bool full_info) const
 }
 
 //=========================================================================
-//================== DataTagOpcDA =========================================
+//================== DataBrowseItem =======================================
 //=========================================================================
 
-
-DataTagOpcDA::DataTagOpcDA(const QString &host, const QString &endpoint, const QString &tagname)
-    : DataTag(DataTag::DataSource::OPCDA, host, endpoint, tagname)
-    , tag_name_wstring_(tagname.toStdWString())
+DataBrowseItem::DataBrowseItem(ItemType type, DataTag::DataSource source, const QString& name, const QString &id, DataBrowseItem *parent)
+    : type_(type)
+    , source_(source)
+    , item_id_(id)
+    , item_browse_name_(name)
+    , parent_(parent)
 {
+    bool b = false;
+
+    b = !parent && type_ != ItemType::ROOT;
+    b = !b && (parent && parent->type_ == ItemType::ROOT && type_ != ItemType::HOST);
+    b = !b && (parent && parent->type_ == ItemType::HOST && type_ != ItemType::ENDPOINT);
+    b = !b && (parent && parent->type_ == ItemType::ENDPOINT && !(type_ == ItemType::NODE || type_ == ItemType::VARIABLE));
+
+    if(b) type_ = ItemType::INVALID;
 }
 
-tagOPCITEMDEF DataTagOpcDA::GetItemDefStruct()
+DataBrowseItem *DataBrowseItem::Child(int row) const
 {
-    QMutexLocker locker(&mtx_);
-    tagOPCITEMDEF ret_def;
-    ret_def.szItemID = tag_name_wstring_.data();
-    ret_def.szAccessPath = NULL;
-    ret_def.bActive = TRUE;
-    ret_def.hClient = 0;
-    ret_def.vtRequestedDataType = opc_legacy_type_;
-    ret_def.dwBlobSize = 0;
-    ret_def.pBlob = NULL;
-    return ret_def;
+    if(row < 0 || row >= static_cast<int>(child_ids_.size())) return nullptr;
+    auto it = child_ids_.cbegin();
+    std::advance(it, row);
+    return childs_.at(&(*it)).get();
 }
 
-void DataTagOpcDA::SetOPCItemState(tagOPCITEMSTATE *item_state)
+DataBrowseItem *DataBrowseItem::Child(const QString &id) const
 {
-    QMutexLocker locker(&mtx_);
-    if(!item_state) return;
-    last_opc_value_ = *item_state;
-    opc_legacy_type_ = VARENUM(last_opc_value_.vDataValue.vt);
-    data_type_ = get_type_from_opc_legacy_type_(opc_legacy_type_);
-    value_ = extract_value_from_opc_struct_();
-    switch(last_opc_value_.wQuality) {
-    case 0xC0:  tag_quality_ = DataQuality::GOOD; break;
-    case 0x00:
-    case 0x04:
-    case 0x08:
-    case 0x0c:
-    case 0x10:
-    case 0x1c:
-    case 0x18:  tag_quality_ = DataQuality::BAD; break;
-    default:    tag_quality_ = DataQuality::UNCERTAIN; break;
+    auto it = std::find(child_ids_.begin(), child_ids_.end(), id);
+    if(it == child_ids_.end()) return nullptr;
+    return childs_.at(&(*it)).get();
+}
+
+DataBrowseItem *DataBrowseItem::ChildByName(const QString &name) const
+{
+    if(name_to_child_ptr_cache_.contains(name)) {
+        return name_to_child_ptr_cache_.at(name);
+    }
+    return nullptr;
+}
+
+DataBrowseItem *DataBrowseItem::ChildById(const QString &id) const
+{
+
+    if(id_to_child_ptr_cache_.contains(id)) {
+        return id_to_child_ptr_cache_.at(id);
+    }
+    return nullptr;
+}
+
+DataBrowseItem::~DataBrowseItem()
+{
+    std::queue<std::unique_ptr<DataBrowseItem>> nodes_to_delete;
+
+    for (auto& [_, child_ptr] : childs_) {
+        if (child_ptr) {
+            nodes_to_delete.push(std::move(child_ptr));
+        }
+    }
+
+    childs_.clear();
+    child_ids_.clear();
+
+    while (!nodes_to_delete.empty()) {
+        std::unique_ptr<DataBrowseItem> current_node = std::move(nodes_to_delete.front());
+        nodes_to_delete.pop();
+
+        if (!current_node) continue;
+
+        for (auto& [_, sub_child_ptr] : current_node->childs_) {
+            if (sub_child_ptr) {
+                nodes_to_delete.push(std::move(sub_child_ptr));
+            }
+        }
+
+        current_node->childs_.clear();
+        current_node->child_ids_.clear();
     }
 }
 
-WORD DataTagOpcDA::GetOpcDaQuality() const
+int DataBrowseItem::ChildCount(bool exclude_variables) const
 {
-    return last_opc_value_.wQuality;
+    if(exclude_variables) {
+        size_t ret_val = 0;
+        for(const auto& [id, node_ptr]: childs_) {
+            if(node_ptr->type_ != ItemType::VARIABLE) {
+                ++ret_val;
+            }
+        }
+        return ret_val;
+    }
+    return child_ids_.size();
 }
 
-QString DataTagOpcDA::GetOpcDaQualityAsString() const
+QVariant DataBrowseItem::Data(int column) const
 {
-    switch (last_opc_value_.wQuality) {
-    case 0x00: return u"Bad"_s;
-    case 0x04: return u"Config Error"_s;
-    case 0x08: return u"Not Connected"_s;
-    case 0x0C: return u"Device Failure"_s;
-    case 0x10: return u"Sensor Failure"_s;
-    case 0x14: return u"Last Known"_s;
-    case 0x18: return u"Comm Failure"_s;
-    case 0x1C: return u"Out of Service"_s;
-    case 0x20: return u"Initializing"_s;
-    case 0x40: return u"Uncertain"_s;
-    case 0x44: return u"Last Usable"_s;
-    case 0x50: return u"Sensor Calibration"_s;
-    case 0x54: return u"EGU Exceeded"_s;
-    case 0x58: return u"Sub Normal"_s;
-    case 0xC0: return u"Good"_s;
-    case 0xD8: return u"Local Override"_s;
-    default: return u"Unknown"_s;
+    if(column == 0 && !(type_ == ItemType::ROOT || type_ == ItemType::VARIABLE || type_ == ItemType::INVALID)) return item_browse_name_;
+    if(column == 1 && type_ == ItemType::ENDPOINT) {
+        switch(source_) {
+        case DataTag::DataSource::OPCDA: return u"[OPC  DA]"_s;
+        case DataTag::DataSource::OPCUA: return u"[OPC  UA]"_s;
+        default:                return u"[UNKNOWN]"_s;
+        }
     }
+    if(column == 2 && (type_ == ItemType::ENDPOINT || type_ == ItemType::NODE)) {
+        return QString("[%1]").arg(n_child_variables_recursive_);
+    }
+    return QVariant();
 }
 
-std::optional<VARIANT> DataTagOpcDA::GetOPCVariantToWrite()
+int DataBrowseItem::Row() const
 {
-    QMutexLocker locker(&mtx_);
-    if(!value_to_write_.isValid()) return std::nullopt;
-    VARIANT ret_var;
-    ret_var.vt = opc_legacy_type_;
-    double gain = gain_value_.has_value() ? gain_value_.value() : 1.0;
-    switch(ret_var.vt) {
-    case VT_I2: ret_var.iVal = static_cast<SHORT>(value_.toInt()); break;
-    case VT_I4: ret_var.lVal = static_cast<LONG>(value_.toInt()); break;
-    case VT_I1: ret_var.bVal = static_cast<SHORT>(value_.toInt()); break;
-    case VT_I8: ret_var.llVal = static_cast<LONGLONG>(value_.toInt()); break;
-    case VT_INT: ret_var.intVal = static_cast<INT>(value_.toInt()); break;
-    case VT_R4: ret_var.fltVal = static_cast<FLOAT>(value_.toDouble() / gain); break;
-    case VT_R8: ret_var.dblVal = static_cast<DOUBLE>(value_.toDouble() / gain); break;
-    case VT_UI2: ret_var.uiVal = static_cast<USHORT>(value_.toUInt()); break;
-    case VT_UI4: ret_var.ulVal = static_cast<ULONG>(value_.toUInt()); break;
-    case VT_UI1: ret_var.uiVal = static_cast<USHORT>(value_.toUInt()); break;
-    case VT_UI8: ret_var.ullVal = static_cast<ULONGLONG>(value_.toUInt()); break;
-    case VT_UINT: ret_var.uintVal = static_cast<UINT>(value_.toUInt()); break;
-    case VT_BSTR: {
-        buffer_string_ = value_.toString().toStdWString();
-        ret_var.bstrVal = const_cast<wchar_t*>(buffer_string_.c_str());
-        break;
-    }
-    case VT_BOOL: ret_var.boolVal = value_.toBool() ? VARIANT_TRUE : VARIANT_FALSE; break;
-    default : return std::nullopt;
-    }
-    return ret_var;
+    if(!parent_) return 0;
+    auto it = std::find(parent_->child_ids_.begin(), parent_->child_ids_.end(), item_id_);
+
+    if(it == parent_->child_ids_.end()) return -1;
+
+    return std::distance(parent_->child_ids_.begin(), it);
 }
 
-QVariant DataTagOpcDA::extract_value_from_opc_struct_() const
+DataBrowseItem *DataBrowseItem::ParentItem()
 {
-    QVariant ret_val;
-    switch(opc_legacy_type_) {
-    case VT_I1: ret_val = static_cast<int64_t>(last_opc_value_.vDataValue.bVal); break;
-    case VT_I2: ret_val = static_cast<int64_t>(last_opc_value_.vDataValue.iVal); break;
-    case VT_I4: ret_val = static_cast<int64_t>(last_opc_value_.vDataValue.lVal); break;
-    case VT_I8: ret_val = static_cast<int64_t>(last_opc_value_.vDataValue.llVal); break;
-    case VT_INT: ret_val = static_cast<int64_t>(last_opc_value_.vDataValue.intVal); break;
-    case VT_R4: ret_val = static_cast<double>(last_opc_value_.vDataValue.fltVal); break;
-    case VT_R8: ret_val = static_cast<double>(last_opc_value_.vDataValue.dblVal); break;
-    case VT_UI1: ret_val = static_cast<size_t>(last_opc_value_.vDataValue.uiVal); break;
-    case VT_UI2: ret_val = static_cast<size_t>(last_opc_value_.vDataValue.uiVal); break;
-    case VT_UI4: ret_val = static_cast<size_t>(last_opc_value_.vDataValue.ulVal); break;
-    case VT_UI8: ret_val = static_cast<size_t>(last_opc_value_.vDataValue.ullVal); break;
-    case VT_UINT: ret_val = static_cast<size_t>(last_opc_value_.vDataValue.uintVal); break;
-    case VT_BOOL: ret_val = last_opc_value_.vDataValue.boolVal == VARIANT_TRUE ? true : false; break;
-    default: ;
+    return parent_;
+}
+
+const QString &DataBrowseItem::GetId() const
+{
+    return item_id_;
+}
+
+const QString &DataBrowseItem::GetBrowseName() const
+{
+    return item_browse_name_;
+}
+
+DataTag::DataSource DataBrowseItem::GetSource() const
+{
+    return source_;
+}
+
+DataBrowseItem::ItemType DataBrowseItem::GetType() const
+{
+    return type_;
+}
+
+void DataBrowseItem::SetTempVarCount(size_t n)
+{
+    n_child_variables_recursive_ = n;
+}
+
+void DataBrowseItem::AbsorbChilds(DataBrowseItem *other_item)
+{
+    for(auto& [_, child_ptr]: other_item->childs_) {
+        AppendChild(std::move(child_ptr));
+    }
+    other_item->childs_.clear();
+    other_item->child_ids_.clear();
+    other_item->name_to_child_ptr_cache_.clear();
+    other_item->id_to_child_ptr_cache_.clear();
+}
+
+size_t DataBrowseItem::UpdateItemRecursievly()
+{
+    n_child_variables_recursive_ = get_variables_count_();
+    return n_child_variables_recursive_;
+}
+
+size_t DataBrowseItem::get_variables_count_() const
+{
+    size_t ret_val = ChildCount(false /*all childes*/) - ChildCount(true/*exclude variables*/);
+    for(const auto& [_, it]: childs_) {
+        ret_val += it->UpdateItemRecursievly();
     }
     return ret_val;
 }
 
-DataTag::DataType DataTagOpcDA::get_type_from_opc_legacy_type_(const unsigned short usType) const
+bool DataBrowseItem::AppendChild(std::unique_ptr<DataBrowseItem> &&child, int row)
 {
-    switch (usType)    {
-        using enum VARENUM;
-    case VT_R4          : return DataType::FLOAT4;
-    case VT_R8          : return DataType::REAL8;
-    case VT_ARRAY       : return DataType::UNSUPPORTED;
-    case VT_BOOL        : return DataType::BOOLEAN;
-    case VT_BSTR        : return DataType::WSTRING;
-    case VT_DECIMAL     : return DataType::UNSUPPORTED;;
-    case VT_I1          : return DataType::INT1;
-    case VT_I2          : return DataType::INT2;
-    case VT_I4          : return DataType::INT4;
-    case VT_I8          : return DataType::INT8;
-    case VT_INT         : return DataType::INT4;
-    case VT_UI2         : return DataType::UINT2;
-    case VT_UI4         : return DataType::UINT4;
-    case VT_UI1         : return DataType::UINT1;
-    case VT_UINT        : return DataType::UINT4;
-    case VT_FILETIME    : return DataType::UNSUPPORTED;
-    default             : return DataType::UNKNOWN;
+    if(!child) return false;
+    if(!(type_ == ItemType::ROOT || type_ == ItemType::HOST) && child->source_ != source_) return false;
+
+    switch(child->type_) {
+    case ItemType::ROOT:        return false;
+    case ItemType::HOST:        if(type_ != ItemType::ROOT) return false; break;
+    case ItemType::ENDPOINT:    if(type_ != ItemType::HOST) return false; break;
+    case ItemType::NODE:        if(type_ != ItemType::ENDPOINT && type_ != ItemType::NODE) return false; break;
+    case ItemType::VARIABLE:    if(type_ != ItemType::ENDPOINT && type_ != ItemType::NODE) return false; break;
+    default:                    return false;
     }
+
+    auto it = std::find(child_ids_.begin(), child_ids_.end(), child->item_id_);
+    if(it != child_ids_.end()) return false;
+
+    if(row == -1) {
+        child_ids_.push_back(child->item_id_);
+        childs_[&child_ids_.back()] = std::move(child);
+        childs_.at(&child_ids_.back())->parent_ = this;
+        DataBrowseItem* child_raw_ptr = childs_.at(&child_ids_.back()).get();
+        name_to_child_ptr_cache_[child_raw_ptr->GetBrowseName()] = child_raw_ptr;
+        id_to_child_ptr_cache_[child_raw_ptr->GetId()] = child_raw_ptr;
+        return true;
+    }
+    if(row < 0 || row > static_cast<int>(child_ids_.size())) {
+        return false;
+    }
+
+    auto it_pos = child_ids_.begin();
+    std::advance(it_pos, row);
+    it = child_ids_.insert(it_pos, child->item_id_);
+    childs_[&(*it)] = std::move(child);
+    childs_.at(&(*it))->parent_ = this;
+    DataBrowseItem* child_raw_ptr = childs_.at(&(*it)).get();
+    name_to_child_ptr_cache_[child_raw_ptr->GetBrowseName()] = child_raw_ptr;
+    id_to_child_ptr_cache_[child_raw_ptr->GetId()] = child_raw_ptr;
+    return true;
 }
 
-//=========================================================================
-//================== DataTagOpcDA =========================================
-//=========================================================================
-
-DataTagOpcUA::DataTagOpcUA(const QString &host, const QString &endpoint, const QString &tagname)
-    : DataTag(DataSource::OPCUA, host, endpoint, tagname)
+bool DataBrowseItem::AppendChild(ItemType type, const QString& name, const QString& id, int row)
 {
-
+    auto it = std::find(child_ids_.begin(), child_ids_.end(), id);
+    if(it != child_ids_.end()) return false;
+    return AppendChild(std::make_unique<DataBrowseItem>(type, source_, name, id, this), row);
 }
 
+DataBrowseItem *DataBrowseItem::check_childs_(const DataBrowseItem *parent_item, const QString &node_id) const
+{
+    if(auto node_ptr = parent_item->ChildById(node_id)) return node_ptr;
+
+    for(const auto& [id_ptr, item_ptr]: parent_item->childs_) {
+        if(auto item = check_childs_(item_ptr.get(), node_id)) return item;
+    }
+    return nullptr;
+}
+
+DataBrowseItem *DataBrowseItem::FindChildItemRecursievly(const QString &node_id) const
+{
+    return check_childs_(this, node_id);
+}
+
+bool DataBrowseItem::DeleteChild(const QString &id)
+{
+    auto it = std::find(child_ids_.begin(), child_ids_.end(), id);
+    if(it != child_ids_.end()) {
+        if (auto* child_ptr = childs_.at(&(*it)).get()) {
+            name_to_child_ptr_cache_.erase(child_ptr->GetBrowseName());
+            id_to_child_ptr_cache_.erase(child_ptr->GetId());
+        }
+        childs_.erase(&(*it));
+        child_ids_.erase(it);
+        return true;
+    }
+    return false;
+}
 

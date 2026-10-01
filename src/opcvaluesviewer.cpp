@@ -4,12 +4,13 @@
 #include <QLineEdit>
 #include <QItemSelection>
 
-#include "opcdatamanager.h"
 #include "plaintextconsole.h"
 #include "opctagpostprocessingwidget.h"
-#include "sourcedrivermanager.h"
+#include "sourcedrivers/sourcedrivermanager.h"
 #include "datatagregistry.h"
 #include "datatag.h"
+
+using namespace Qt::StringLiterals;
 
 OPCValuesViewer::OPCValuesViewer(SourceDriverManager* dm_ptr, QWidget *parent)
     : QWidget(parent)
@@ -27,7 +28,7 @@ OPCValuesViewer::OPCValuesViewer(SourceDriverManager* dm_ptr, QWidget *parent)
         ui->pbStartOPC->setEnabled(true);
     }
 
-    opc_values_viewer_model_ = new OPCValuesViewerModel(driver_manager_->TagRegistry()->GetIdToTagsMap(), this);
+    opc_values_viewer_model_ = new OPCValuesViewerModel(driver_manager_, driver_manager_->TagRegistry()->GetIdToTagsMap(), this);
     ui->tvOPCValuesViewer->setModel(opc_values_viewer_model_);
     ui->tvOPCValuesViewer->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tvOPCValuesViewer->verticalHeader()->hide();
@@ -150,15 +151,21 @@ void OPCValuesViewer::sl_periodic_tags_list_changed()
     opc_values_viewer_model_->SetTagsToTable(driver_manager_->TagRegistry()->GetIdToTagsMap());
 }
 
+void OPCValuesViewer::sl_get_message_to_console(QString mes)
+{
+    console_->sl_add_text_to_console(mes);
+}
+
 //====================================================================================
 //================= O P C V a l u e W r i t e D i a l o g ============================
 //====================================================================================
 
-OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, QWidget *parent)
+OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, SourceDriverManager* driver_manager, QWidget *parent)
     : QDialog(parent, Qt::Dialog)
     , tag_ptr_(tag_ptr)
+    , driver_manager_(driver_manager)
 {
-    setWindowTitle("Значение для записи");
+    setWindowTitle(u"Значение для записи"_s);
     QVBoxLayout* vbla = new QVBoxLayout();
     le_value_ = new QLineEdit();
     le_value_->setAlignment(Qt::AlignCenter);
@@ -166,7 +173,7 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, QWidg
 
     QValidator* le_validator = nullptr;
     if(tag_ptr_) {
-        if(!le_validator && tag_ptr_->ValueIsReal()) le_validator = new QDoubleValidator(-10000.0, 10000.0, 1);
+        if(!le_validator && tag_ptr_->ValueIsReal()) le_validator = new QDoubleValidator(-10000.0, 10000.0, 4);
         if(!le_validator && tag_ptr_->ValueIsInteger()) le_validator = new QIntValidator(-10000, 10000);
         if(!le_validator && tag_ptr_->ValueIsUnsignedInteger()) le_validator = new QIntValidator(0, 10000);
         if(!le_validator && tag_ptr_->ValueIsBool()) le_validator = new QIntValidator(0,1);
@@ -174,11 +181,11 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, QWidg
     }
     le_value_->setValidator(le_validator);
 
-    QPushButton* ok_btn = new QPushButton("OK");
-    QObject::connect(ok_btn, SIGNAL(pressed()), this, SLOT(sl_set_value_to_tag_and_close()));
+    QPushButton* ok_btn = new QPushButton(u"OK"_s);
+    QObject::connect(ok_btn, &QAbstractButton::pressed, this, &OPCValueWriteDialog::sl_set_value_to_tag_and_close);
 
-    QPushButton* cancel_btn = new QPushButton("Отмена");
-    QObject::connect(cancel_btn, SIGNAL(pressed()), this, SLOT(close()));
+    QPushButton* cancel_btn = new QPushButton(u"Отмена"_s);
+    QObject::connect(cancel_btn, &QAbstractButton::pressed, this, &QWidget::close);
     QHBoxLayout* hbla = new QHBoxLayout();
     hbla->addWidget(ok_btn);
     hbla->addWidget(cancel_btn);
@@ -191,27 +198,28 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, QWidg
 void OPCValueWriteDialog::sl_set_value_to_tag_and_close()
 {
     if(tag_ptr_) {
-        ValueVariant val;
+        std::optional<ValueVariant> val;
         if(tag_ptr_->ValueIsReal()) {
             bool b = false;
-            double dblVal = 0.0;
-            dblVal = le_value_->text().toDouble(&b);
+            double dblVal = QString(le_value_->text()).replace(u',', u'.').toDouble(&b);
             if(b) val = dblVal;
-        }
-        if(tag_ptr_->ValueIsInteger() || tag_ptr_->ValueIsBool()) {
+        } else if(tag_ptr_->ValueIsInteger() || tag_ptr_->ValueIsBool()) {
             bool b = false;
-            double intVal = 0.0;
-            intVal = le_value_->text().toInt(&b);
+            int64_t intVal = le_value_->text().toLongLong(&b);
             if(b) val = intVal;
-        }
-        if(tag_ptr_->ValueIsUnsignedInteger()) {
+        } else if(tag_ptr_->ValueIsUnsignedInteger()) {
             bool b = false;
-            double uintVal = 0.0;
-            uintVal = le_value_->text().toUInt(&b);
+            int64_t uintVal = le_value_->text().toULongLong(&b);
             if(b) val = uintVal;
+        } else if(tag_ptr_->ValueIsString()) {
+            val = le_value_->text();
         }
-        if(!val.valueless_by_exception()) {
-            tag_ptr_->SetValueToWrite(val);
+
+        if(val.has_value()) {
+            tag_ptr_->SetValueToWrite(val.value());
+            if(driver_manager_) {
+                driver_manager_->WriteTagNow(tag_ptr_);
+            }
         }
     }
     close();
@@ -222,13 +230,16 @@ void OPCValueWriteDialog::sl_set_value_to_tag_and_close()
 //================= O P C V a l u e s V i e w e r M o d e l ==========================
 //====================================================================================
 
-OPCValuesViewerModel::OPCValuesViewerModel(QObject *parent): QAbstractTableModel(parent)
+OPCValuesViewerModel::OPCValuesViewerModel(SourceDriverManager* driver_manager, QObject *parent)
+    : QAbstractTableModel(parent)
+    , driver_manager_(driver_manager)
 {
 
 }
 
-OPCValuesViewerModel::OPCValuesViewerModel(const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map, QObject* parent)
+OPCValuesViewerModel::OPCValuesViewerModel(SourceDriverManager* driver_manager, const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map, QObject* parent)
     : QAbstractTableModel(parent)
+    , driver_manager_(driver_manager)
     , id_to_tag_(tags_map)
 {
     auto ids_view = std::views::keys(id_to_tag_);
@@ -367,7 +378,7 @@ void OPCValuesViewerModel::sl_table_view_cell_double_clicked(const QModelIndex &
         if(id_to_tag_.count(id_tags_ordered_.at(index.row())) == 0 || !id_to_tag_.at(id_tags_ordered_.at(index.row()))) return;
         auto tag_ptr = id_to_tag_.at(id_tags_ordered_.at(index.row()));
 
-        OPCValueWriteDialog* set_value_dialog = new OPCValueWriteDialog(tag_ptr);
+        OPCValueWriteDialog* set_value_dialog = new OPCValueWriteDialog(tag_ptr, driver_manager_);
         set_value_dialog->exec();
         set_value_dialog->deleteLater();
     }
@@ -376,7 +387,7 @@ void OPCValuesViewerModel::sl_table_view_cell_double_clicked(const QModelIndex &
 void OPCValuesViewerModel::sl_tags_values_updated()
 {
     if(rowCount(QModelIndex()) == 0) return;
-    auto index_start = createIndex(0, 2);
+    auto index_start = createIndex(0, 1);
     auto index_end = createIndex(rowCount(QModelIndex()) - 1, 4);
     emit dataChanged(index_start, index_end, {Qt::DisplayRole});
 }

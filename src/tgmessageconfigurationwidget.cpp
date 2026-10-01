@@ -3,8 +3,8 @@
 
 #include "selectitemstablewigget.h"
 #include "datatag.h"
-#include "tgbotmanager.h"
-#include "tgobject.h"
+#include "tgobjects/tgbotmanager.h"
+#include "tgobjects/tgobject.h"
 
 TGMessageConfigurationWidget::TGMessageConfigurationWidget(TgBotManager &tg_bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -17,7 +17,12 @@ TGMessageConfigurationWidget::TGMessageConfigurationWidget(TgBotManager &tg_bot_
     ui->gbInlineButtons->layout()->addWidget(inline_buttons_to_message_);
     inline_buttons_to_message_->ResetContent();
 
-    QObject::connect(ui->twOPCTagsList, SIGNAL(cellDoubleClicked(int,int)), this, SLOT(sl_opc_table_messages_double_click(int,int)));
+    wait_answer_tag_to_message_ = new SelectItemsTableWidget(tg_bot_manager_, SITW_TYPE::WaitAnswerTag, 1, this);
+    ui->gbInlineButtons->layout()->addWidget(wait_answer_tag_to_message_);
+    wait_answer_tag_to_message_->ResetContent();
+    wait_answer_tag_to_message_->setVisible(false);
+
+    QObject::connect(ui->twOPCTagsList, &QTableWidget::cellDoubleClicked, this, &TGMessageConfigurationWidget::sl_opc_table_messages_double_click);
 
     clear_message_data_();
 }
@@ -102,6 +107,9 @@ void TGMessageConfigurationWidget::clear_message_data_()
     ui->ptMessage->setPlainText("");
     ui->ptMessage->setEnabled(false);
     inline_buttons_to_message_->ResetContent();
+    inline_buttons_to_message_->setVisible(true);
+    wait_answer_tag_to_message_->ResetContent();
+    wait_answer_tag_to_message_->setVisible(false);
     ui->twOPCTagsList->clearContents();
     ui->twOPCTagsList->update();
 }
@@ -117,7 +125,13 @@ void TGMessageConfigurationWidget::save_to_current_message_()
     }
 
     current_message_->SetText(ui->ptMessage->toPlainText().toStdString());
-    inline_buttons_to_message_->SetButtonsToMessage(current_message_);
+
+    auto* wait_answer_ptr = dynamic_cast<TGMessageWaitAnswer*>(current_message_);
+    if(wait_answer_ptr) {
+        wait_answer_tag_to_message_->SetWaitAnswerTagToMessage(wait_answer_ptr);
+    } else {
+        inline_buttons_to_message_->SetButtonsToMessage(current_message_);
+    }
 
     emit sg_tgobject_changed(current_message_->GetId(), prev);
 }
@@ -149,10 +163,21 @@ void TGMessageConfigurationWidget::load_data_from_message_(const std::string &id
         }
     }
 
-    if(current_message_->HasButtons()) {
-        inline_buttons_to_message_->ReadMessageContent(current_message_);
-    } else {
+    auto* wait_answer_ptr = dynamic_cast<TGMessageWaitAnswer*>(current_message_);
+    if(wait_answer_ptr) {
         inline_buttons_to_message_->ResetContent();
+        inline_buttons_to_message_->setVisible(false);
+        wait_answer_tag_to_message_->ReadWaitAnswerTagContent(wait_answer_ptr);
+        wait_answer_tag_to_message_->setVisible(true);
+    } else {
+        wait_answer_tag_to_message_->ResetContent();
+        wait_answer_tag_to_message_->setVisible(false);
+        inline_buttons_to_message_->setVisible(true);
+        if(current_message_->HasButtons()) {
+            inline_buttons_to_message_->ReadMessageContent(current_message_);
+        } else {
+            inline_buttons_to_message_->ResetContent();
+        }
     }
 }
 

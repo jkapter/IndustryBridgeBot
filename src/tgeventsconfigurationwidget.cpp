@@ -2,9 +2,11 @@
 #include "ui_tgeventsconfigurationwidget.h"
 
 #include "selectitemstablewigget.h"
-#include "tgbotmanager.h"
-#include "tgobject.h"
+#include "tgobjects/tgbotmanager.h"
+#include "tgobjects/tgobject.h"
 #include "datatag.h"
+
+using namespace Qt::StringLiterals;
 
 TGEventsConfigurationWidget::TGEventsConfigurationWidget(TgBotManager& tg_bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -20,8 +22,8 @@ TGEventsConfigurationWidget::TGEventsConfigurationWidget(TgBotManager& tg_bot_ma
     message_to_event_->ResetContent();
     message_to_scheduled_event_->ResetContent();
 
-    QObject::connect(ui->twOPCTagsEvents, SIGNAL(cellDoubleClicked(int,int)), this, SLOT(sl_opc_table_messages_double_click(int,int)));
-    QObject::connect(ui->cbScheduledEventType, SIGNAL(currentIndexChanged(int)), this, SLOT(sl_make_scheduled_events_layout(int)));
+    QObject::connect(ui->twOPCTagsEvents, &QTableWidget::cellDoubleClicked, this, &TGEventsConfigurationWidget::sl_opc_table_messages_double_click);
+    QObject::connect(ui->cbScheduledEventType, &QComboBox::currentIndexChanged, this, &TGEventsConfigurationWidget::sl_make_scheduled_events_layout);
 
     clear_event_data_();
 
@@ -75,8 +77,8 @@ void TGEventsConfigurationWidget::sl_opc_table_messages_double_click(int row, in
         opc_tag = tg_bot_manager_.GetTGParent()->TagManager()->GetTagOfId(tag_id);
     }
 
-    ui->leTagCompareValue->setText("0");
-    ui->leTagCompareValueHysterezis->setText("0");
+    ui->leTagCompareValue->setText(u"0"_s);
+    ui->leTagCompareValueHysterezis->setText(u"0"_s);
     ui->leTagCompareValue->setValidator(get_event_values_validator(opc_tag.get()));
     ui->leTagCompareValueHysterezis->setValidator(get_event_values_validator(opc_tag.get()));
     load_data_from_event_(ui->leEventID->text().toStdString());
@@ -390,7 +392,7 @@ void TGEventsConfigurationWidget::opc_table_set_column_width_(QTableWidget* tbl)
     tbl->setColumnWidth(2, w3 - 2);
 }
 
-QValidator* TGEventsConfigurationWidget::get_event_values_validator(const DataTag* tag) const
+QValidator* TGEventsConfigurationWidget::get_event_values_validator(DataTag* tag)
 {
     if(!tag) return nullptr;
     if(tag->ValueIsReal()) return new QDoubleValidator(-10000.0, 10000.0, 1);

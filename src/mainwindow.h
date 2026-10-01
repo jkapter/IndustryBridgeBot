@@ -1,11 +1,13 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <memory>
+
 #include <QObject>
 #include <QMainWindow>
 #include <QSystemTrayIcon>
 
-#include "copcclient.h"
+#include "sourcedrivers/copcclient.h"
 #include "datatag.h"
 
 QT_BEGIN_NAMESPACE
@@ -18,6 +20,7 @@ class TgBotManager;
 class SourceDriverManager;
 class QSystemTrayIcon;
 class QLabel;
+class QMessageBox;
 
 class MainWindow : public QMainWindow
 {
@@ -50,6 +53,7 @@ private slots:
     void sl_status_bar_opc_label_change_text(DataTag::DataSource driver, bool is_connected);
     void sl_status_bar_bot_label_change_text();
     void sl_status_bar_message_label_change_text(QString message);
+    void sl_bot_error(QString what);
     void sl_pb_tgsettings_page_clicked();
     void sl_animation_main_menu_finished();
     void sl_pb_tgconfig_page_clicked();
@@ -61,7 +65,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    OPC_HELPER::COPCClient tst_dlg_;
+    COPCClient tst_dlg_;
     TgBotManager* tg_bot_manager_ = nullptr;
     SourceDriverManager* source_data_manager_ = nullptr;
 
@@ -74,6 +78,7 @@ private:
     QLabel *status_bar_opc_ua_label_;
     QLabel *status_bar_bot_label_;
     QLabel *status_bar_message_label_;
+    std::unique_ptr<QMessageBox> bot_error_message_;
 
     bool bFirstMinimized_ = false;
     bool bFirstClosed_ = false;

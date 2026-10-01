@@ -53,6 +53,49 @@ include_directories(
     ${BOOST_ROOT}
 )
 
+set(OPCDATGBOT_CORE_SOURCES
+    logger.h logger.cpp
+    datatag.h datatag.cpp
+    datatag_opcua.h datatag_opcua.cpp
+    datatagregistry.h datatagregistry.cpp
+    sourcedrivers/sourcedrivers.h sourcedrivers/sourcedrivers.cpp
+    sourcedrivers/sourcedrivermanager.h sourcedrivers/sourcedrivermanager.cpp
+    sourcedrivers/copcuaclient.h sourcedrivers/copcuaclient.cpp
+    tgobjects/tgobject.h tgobjects/tgobject.cpp
+    tgobjects/tgbotmanager.h tgobjects/tgbotmanager.cpp
+    tgobjects/tgbotthreadwrapper.h tgobjects/tgbotthreadwrapper.cpp
+)
+
+if(WIN32)
+    list(APPEND OPCDATGBOT_CORE_SOURCES
+        datatag_opcda.h datatag_opcda.cpp
+        sourcedrivers/copcclient.h sourcedrivers/copcclient.cpp
+        sourcedrivers/opcclientworker.h sourcedrivers/opcclientworker.cpp
+        sourcedrivers/opcda_driver.cpp
+    )
+endif()
+
+add_library(OPCDATgBotCore STATIC ${OPCDATGBOT_CORE_SOURCES})
+
+target_link_libraries(OPCDATgBotCore PUBLIC
+    Qt6::Core
+    Qt6::OpcUa
+    TgBot::TgBot
+)
+
+if(WIN32)
+    target_link_libraries(OPCDATgBotCore PUBLIC
+
+        ws2_32
+        wldap32
+        crypt32
+        normaliz
+        ole32
+        oleaut32
+        uuid
+    )
+endif()
+
 set(PROJECT_SOURCES
         main.cpp
         mainwindow.cpp
@@ -61,14 +104,6 @@ set(PROJECT_SOURCES
 )
 
 qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
-    # opctag.h opctag.cpp
-    logger.h logger.cpp
-    # opcdatamanager.h opcdatamanager.cpp
-    opcclientworker.h opcclientworker.cpp
-    copcclient.h copcclient.cpp
-    tgobject.h tgobject.cpp
-    tgbotmanager.h tgbotmanager.cpp
-    tgbotthreadwrapper.h tgbotthreadwrapper.cpp
     res.qrc
     ${app_icon_resource_windows}
     ../styles/styles.qss
@@ -84,29 +119,18 @@ qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
     tgcommandconfigurationwidget.h tgcommandconfigurationwidget.cpp tgcommandconfigurationwidget.ui
     tginlinebuttonsconfigurationwidget.h tginlinebuttonsconfigurationwidget.cpp tginlinebuttonsconfigurationwidget.ui
     tgeventsconfigurationwidget.h tgeventsconfigurationwidget.cpp tgeventsconfigurationwidget.ui
-    datatag.h datatag.cpp
-    datatagregistry.h datatagregistry.cpp
-    sourcedrivermanager.h sourcedrivermanager.cpp
-    sourcedrivers.h sourcedrivers.cpp
-    copcuaclient.h copcuaclient.cpp
 )
 
 target_link_libraries(OPCDATgBot PRIVATE
-    TgBot::TgBot
+    OPCDATgBotCore
     Qt6::Widgets
     Qt6::OpcUa
+    TgBot::TgBot
     ${CURL_LIBRARIES}
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB
     ${CMAKE_THREAD_LIBS_INIT}
-    ws2_32
-    wldap32
-    crypt32
-    normaliz
-    ole32
-    oleaut32
-    uuid
 )
 
 

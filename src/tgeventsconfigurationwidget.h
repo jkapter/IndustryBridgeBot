@@ -55,7 +55,7 @@ private:
     void fill_opc_tags_table_(QTableWidget* tbl);
     void opc_table_set_column_width_(QTableWidget* tbl);
 
-    QValidator* get_event_values_validator(const DataTag* tag) const;
+    QValidator* get_event_values_validator(DataTag* tag);
 };
 
 #endif // TGEVENTSCONFIFURATIONWIDGET_H

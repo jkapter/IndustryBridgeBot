@@ -3,8 +3,13 @@
 #include <QFile>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QApplication>
+#include <QCoreApplication>
 #include <QJsonParseError>
+
+#include "datatag_opcua.h"
+#ifdef _WIN32
+#include "datatag_opcda.h"
+#endif
 
 using namespace Qt::StringLiterals;
 
@@ -15,6 +20,25 @@ DataTagRegistry::DataTagRegistry(const QString &filename)
 
 DataTagRegistry::~DataTagRegistry()
 {
+    QDir app_dir(qApp->applicationDirPath());
+    bool autosave_flag = app_dir.exists("autosave");
+    if(!autosave_flag) {
+        autosave_flag = app_dir.mkdir("autosave");
+        if(autosave_flag) {
+            qInfo() << QString("Папка автосохранения конфигурационных файлов успешно создана.");
+        } else {
+            qWarning() << QString("Не удалось создать папку для автосохранения конфигурационных файлов.");
+        }
+    }
+
+    if(autosave_flag) {
+        QString path = QString("%1/autosave").arg(app_dir.absolutePath());
+        qInfo() << QString("Автосохранение кофигурационных файлов DataTagRegistry в папке %1").arg(path);
+        SaveDataToFile(path);
+    } else {
+        qWarning() << "Автосохранение кофигурационных файлов DataTagRegistry не удалось.";
+    }
+
     clear_data_();
 }
 
@@ -22,7 +46,7 @@ std::optional<size_t> DataTagRegistry::check_tag_(std::shared_ptr<DataTag> tag)
 {
     QString host = tag->GetHostName();
     QString server = tag->GetEndpointName();
-    QString tag_name = tag->GetTagName();
+    QString tag_name = tag->GetTagId();
 
     if(!hostnames_.contains(host)) return std::nullopt;
     const QString* host_it = &(*hostnames_.find(host));
@@ -52,7 +76,7 @@ bool DataTagRegistry::restore_data_tag_(size_t id, std::shared_ptr<DataTag> tag)
 
     QString host = tag->GetHostName();
     QString server = tag->GetEndpointName();
-    QString tag_name = tag->GetTagName();
+    QString tag_name = tag->GetTagId();
 
     all_owned_ids_.insert(id);
     id_tag_to_opc_da_tag_pointer_[id] = std::move(tag);
@@ -70,7 +94,7 @@ size_t DataTagRegistry::AddDataTag(std::shared_ptr<DataTag> tag)
     size_t last_id = all_owned_ids_.size() > 0 ? *all_owned_ids_.rbegin() : 1;
     QString host = tag->GetHostName();
     QString server = tag->GetEndpointName();
-    QString tag_name = tag->GetTagName();
+    QString tag_name = tag->GetTagId();
 
     auto checked_id = check_tag_(tag);
     if(checked_id.has_value()) return checked_id.value();
@@ -95,7 +119,9 @@ size_t DataTagRegistry::AddDataTag(DataTag::DataSource src, const QString &fulln
 
     std::shared_ptr<DataTag> new_tag;
     switch(src) {
+#ifdef _WIN32
     case DataTag::DataSource::OPCDA:    new_tag = std::make_shared<DataTagOpcDA>(match.captured(1), match.captured(2), match.captured(3)); break;
+#endif
     case DataTag::DataSource::OPCUA:    new_tag = std::make_shared<DataTagOpcUA>(match.captured(1), match.captured(2), match.captured(3)); break;
     default:                            new_tag = nullptr;
     }
@@ -112,7 +138,7 @@ void DataTagRegistry::DeleteTag(size_t id)
 
     QString host = tag_ptr->GetHostName();
     QString server = tag_ptr->GetEndpointName();
-    QString tag_name = tag_ptr->GetTagName();
+    QString tag_name = tag_ptr->GetTagId();
 
     auto host_it = hostnames_.find(host);
     auto server_it = hostname_to_servers_.at(&(*host_it)).find(server);
@@ -168,7 +194,8 @@ bool DataTagRegistry::RestoreDataFromFile()
 {
     clear_data_();
 
-    QFile file(filename_);
+    QString filepath = QString("%1/%2").arg(qApp->applicationDirPath(), filename_);
+    QFile file(filepath);
     if(file.open(QIODeviceBase::ReadOnly)) {
         QJsonParseError json_error;
         QJsonDocument input_doc = QJsonDocument::fromJson(file.readAll(), &json_error);
@@ -195,18 +222,21 @@ bool DataTagRegistry::RestoreDataFromFile()
                     for(int j = 0; j < tags_ar.size(); j++) {
                         QJsonObject tag_obj = tags_ar.at(j).toObject();
                         if((tag_obj.contains("id") && tag_obj.value("id").isDouble())
-                            && (tag_obj.contains("tag_name") && tag_obj.value("tag_name").isString())
+                            && (tag_obj.contains("tag_id") && tag_obj.value("tag_id").isString())
                             && (tag_obj.contains("tag_comment") && tag_obj.value("tag_comment").isString())
                             && (tag_obj.contains("source") && tag_obj.value("source").isString())) {
 
                             size_t id = static_cast<size_t>(tag_obj.value("id").toInteger());
-                            QString tag_name = tag_obj.value("tag_name").toString();
+                            QString tag_name = tag_obj.value("tag_id").toString();
                             QString tag_comment = tag_obj.value("tag_comment").toString();
                             QString src_text = tag_obj.value("source").toString();
                             std::shared_ptr<DataTag> tag_ptr;
+#ifdef _WIN32
                             if(src_text == u"OPCDA"_s) {
                                 tag_ptr = std::make_shared<DataTagOpcDA>(hostname, server_name, tag_name);
-                            } else if(src_text == u"OPCUA"_s) {
+                            } else
+#endif
+                            if(src_text == u"OPCUA"_s) {
                                 tag_ptr = std::make_shared<DataTagOpcUA>(hostname, server_name, tag_name);
                             } else {
                                 qWarning() << QString("DataTagRegistry: неверный тип источника тэга %1@%2#%3").arg(hostname, server_name, tag_name);

@@ -38,6 +38,7 @@ private:
 
     TgBotManager& tg_bot_manager_;
     SelectItemsTableWidget* inline_buttons_to_message_ = nullptr;
+    SelectItemsTableWidget* wait_answer_tag_to_message_ = nullptr;
     TGMessage* current_message_ = nullptr;
 
     void fill_opc_tags_table_(QTableWidget* tbl);

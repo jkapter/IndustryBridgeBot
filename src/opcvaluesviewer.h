@@ -32,6 +32,9 @@ signals:
     void sg_set_main_window_status_bar_message(QString message);
     void sg_check_all_buttons_in_table();
 
+public slots:
+    void sl_get_message_to_console(QString mes);
+
 private slots:
     void sl_pb_readonce_clicked();
     void sl_item_comment_processing(QItemSelection selected, QItemSelection deselected);
@@ -55,13 +58,14 @@ class OPCValueWriteDialog: public QDialog {
     Q_OBJECT
 public:
     OPCValueWriteDialog() = delete;
-    explicit OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, QWidget* parent = nullptr);
+    explicit OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, SourceDriverManager* driver_manager, QWidget* parent = nullptr);
 
 private slots:
     void sl_set_value_to_tag_and_close();
 
 private:
     std::shared_ptr<DataTag> tag_ptr_ = nullptr;
+    SourceDriverManager* driver_manager_ = nullptr;
     QLineEdit* le_value_;
 
 };
@@ -70,8 +74,8 @@ class OPCValuesViewerModel: public QAbstractTableModel
 {
     Q_OBJECT
 public:
-    OPCValuesViewerModel(QObject* parent = nullptr);
-    explicit OPCValuesViewerModel(const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map, QObject* parent = nullptr);
+    OPCValuesViewerModel(SourceDriverManager* driver_manager, QObject* parent = nullptr);
+    explicit OPCValuesViewerModel(SourceDriverManager* driver_manager, const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map, QObject* parent = nullptr);
     void SetTagsToTable(const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map);
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;
@@ -87,6 +91,7 @@ public slots:
     void sl_tags_values_updated();
 
 private:
+    SourceDriverManager* driver_manager_ = nullptr;
     std::unordered_map<size_t, std::shared_ptr<DataTag>> id_to_tag_;
     std::vector<size_t> id_tags_ordered_;
 

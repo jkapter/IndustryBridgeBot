@@ -5,8 +5,6 @@
 #include <QVariant>
 #include <QMutex>
 
-#include "opcda.h"
-
 using ValueVariant = std::variant<int64_t, double, QString>;
 
 
@@ -70,7 +68,8 @@ public:
 
     const QString& GetHostName() const;
     const QString& GetEndpointName() const;
-    const QString& GetTagName() const;
+    virtual const QString& GetTagId() const;
+    virtual const QString& GetTagName() const;
     QString GetFullTagDescription() const;
 
     QString GetStringType();
@@ -79,13 +78,13 @@ public:
 
     DataQuality GetTagQuality();
     static QString QualityToString(DataQuality q);
-    bool TagQualityIsGood() const;
+    bool TagQualityIsGood();
 
-    bool ValueIsInteger() const;
-    bool ValueIsReal() const;
-    bool ValueIsUnsignedInteger() const;
-    bool ValueIsString() const;
-    bool ValueIsBool() const;
+    bool ValueIsInteger();
+    bool ValueIsReal();
+    bool ValueIsUnsignedInteger();
+    bool ValueIsString();
+    bool ValueIsBool();
 
     const QString& GetCommentString() const;
     void SetCommentString(const QString& str);
@@ -104,8 +103,6 @@ public:
     void ClearSubstituteStringValues();
     QJsonObject TagToJson(bool full_info = true) const;
 
-    static std::shared_ptr<DataTag> FromJsonObject(const QJsonObject &obj);
-
 private:
     DataSource tag_source_;
 
@@ -114,7 +111,7 @@ protected:
     QString comment_;
     QString hostname_;
     QString endpoint_name_;
-    QString tag_name_;
+    QString tag_id_;
     QVariant value_;
     DataQuality tag_quality_;
     std::optional<double> gain_value_ = std::nullopt;
@@ -124,37 +121,62 @@ protected:
 };
 
 //=========================================================================
-//================== DataTagOpcDA =========================================
+//================== DataBrowseItem =======================================
 //=========================================================================
 
-class DataTagOpcDA: public DataTag
-{
+class DataBrowseItem {
 public:
-    explicit DataTagOpcDA(const QString& host, const QString& endpoint, const QString& tagname);
-    tagOPCITEMDEF GetItemDefStruct();
-    void SetOPCItemState(tagOPCITEMSTATE* item_state);
-    WORD GetOpcDaQuality() const;
-    QString GetOpcDaQualityAsString() const;
-    std::optional<VARIANT> GetOPCVariantToWrite();
+
+    enum class ItemType: uint8_t {
+        ROOT,
+        HOST,
+        ENDPOINT,
+        NODE,
+        VARIABLE,
+        INVALID
+    };
+
+    DataBrowseItem(ItemType type, DataTag::DataSource source, const QString &name, const QString &id, DataBrowseItem *parent);
+    DataBrowseItem *Child(int row) const;
+    DataBrowseItem *Child(const QString &id) const;
+    DataBrowseItem *ChildByName(const QString &name) const;
+    DataBrowseItem *ChildById(const QString &id) const;
+    ~DataBrowseItem();
+    int ChildCount(bool exclude_variables = false) const;
+    QVariant Data(int column) const;
+    int Row() const;
+    DataBrowseItem *ParentItem();
+    const QString& GetId() const;
+    const QString& GetBrowseName() const;
+    DataTag::DataSource GetSource() const;
+    DataBrowseItem::ItemType GetType() const;
+    void SetTempVarCount(size_t n);
+    void AbsorbChilds(DataBrowseItem *other_item);
+    size_t UpdateItemRecursievly();
+    bool AppendChild(std::unique_ptr<DataBrowseItem> &&child, int row = -1);
+    bool AppendChild(ItemType type, const QString &name, const QString &id, int row = -1);
+    DataBrowseItem *FindChildItemRecursievly(const QString &node_id) const;
+    bool DeleteChild(const QString& id);
+    void SetBrowsed(bool b) {was_browsed_from_source_ = b;}
+    bool IsBrowsed() const {return was_browsed_from_source_;}
 
 private:
-    std::wstring tag_name_wstring_;
-    std::wstring buffer_string_;
-    VARENUM opc_legacy_type_ = VT_EMPTY;
-    tagOPCITEMSTATE last_opc_value_ = {};
+    ItemType type_;
+    DataTag::DataSource source_;
+    QString item_id_;
+    QString item_browse_name_;
+    DataBrowseItem *parent_;
+    size_t n_child_variables_recursive_ = 0;
 
-    DataType get_type_from_opc_legacy_type_(const unsigned short usType) const;
-    QVariant extract_value_from_opc_struct_() const;
-};
+    bool was_browsed_from_source_ = false;
 
-//=========================================================================
-//================== DataTagOpcUA =========================================
-//=========================================================================
+    std::unordered_map<const QString*, std::unique_ptr<DataBrowseItem>> childs_;
+    std::unordered_map<QString, DataBrowseItem*> name_to_child_ptr_cache_;
+    std::unordered_map<QString, DataBrowseItem*> id_to_child_ptr_cache_;
+    std::list<QString> child_ids_;
 
-class DataTagOpcUA: public DataTag
-{
-public:
-   explicit DataTagOpcUA(const QString& host, const QString& endpoint, const QString& tagname);
+    size_t get_variables_count_() const;
+    DataBrowseItem *check_childs_(const DataBrowseItem *parent_item, const QString &node_id) const;
 
 };
 

@@ -38,13 +38,13 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>3</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tbMessageConfig">
       <attribute name="title">
        <string>Сообщения</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout" columnstretch="2,3">
+      <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="2">
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -57,173 +57,199 @@
        <property name="bottomMargin">
         <number>0</number>
        </property>
-       <property name="horizontalSpacing">
-        <number>9</number>
-       </property>
-       <item row="0" column="0">
-        <widget class="QFrame" name="frame">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
+       <item>
+        <widget class="QSplitter" name="spltMessageConfig">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout">
-          <property name="leftMargin">
-           <number>2</number>
+         <widget class="QFrame" name="frame">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>2</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>2</number>
-          </property>
-          <property name="bottomMargin">
-           <number>2</number>
-          </property>
-          <item>
-           <widget class="QFrame" name="frame_3">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_2">
-             <property name="leftMargin">
-              <number>0</number>
+          <layout class="QVBoxLayout" name="verticalLayout">
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>2</number>
+           </property>
+           <item>
+            <widget class="QFrame" name="frame_3">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <property name="topMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <property name="bottomMargin">
-              <number>2</number>
-             </property>
-             <item>
-              <widget class="QToolButton" name="tbAddTGMessage">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить сообщение</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/add-message.png</normaloff>:/img/icons/add-message.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbDeleteMessage">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Удалить сообщение</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/delete-message.png</normaloff>:/img/icons/delete-message.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbSaveMessage">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Сохранить сообщение</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/save-message.png</normaloff>:/img/icons/save-message.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QTreeView" name="tvTGMessages"/>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QFrame" name="frMessageData">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_2">
-          <property name="spacing">
-           <number>0</number>
+             <layout class="QHBoxLayout" name="horizontalLayout_2">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <item>
+               <widget class="QToolButton" name="tbAddTGMessage">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить сообщение</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add-message.png</normaloff>:/img/icons/add-message.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbAddTGMessageWaitAnswer">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить сообщение с ожиданием ответа</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add-callback-message.png</normaloff>:/img/icons/add-callback-message.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbDeleteMessage">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Удалить сообщение</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/delete-message.png</normaloff>:/img/icons/delete-message.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbSaveMessage">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Сохранить сообщение</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/save-message.png</normaloff>:/img/icons/save-message.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTreeView" name="tvTGMessages"/>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QFrame" name="frMessageData">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="leftMargin">
-           <number>0</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
@@ -232,7 +258,7 @@
       <attribute name="title">
        <string>Команды</string>
       </attribute>
-      <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="2,3">
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -246,222 +272,225 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QFrame" name="frame_4">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
+        <widget class="QSplitter" name="spltCommandsConfig">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_10">
-          <property name="leftMargin">
-           <number>2</number>
+         <widget class="QFrame" name="frame_4">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>2</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>2</number>
-          </property>
-          <property name="bottomMargin">
-           <number>2</number>
-          </property>
-          <item>
-           <widget class="QFrame" name="frame_6">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_4">
-             <property name="leftMargin">
-              <number>0</number>
+          <layout class="QVBoxLayout" name="verticalLayout_10">
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>2</number>
+           </property>
+           <item>
+            <widget class="QFrame" name="frame_6">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <property name="topMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <property name="rightMargin">
-              <number>9</number>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="rightMargin">
+               <number>9</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <item>
+               <widget class="QToolButton" name="tbAddTGCommand">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить команду меню</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add_command.png</normaloff>:/img/icons/add_command.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbDeleteCommand">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Удалить команду меню</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/delete_command.png</normaloff>:/img/icons/delete_command.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbSaveCommands">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Сохранить команду</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/save_command.png</normaloff>:/img/icons/save_command.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbAddTGCommandToMainMenu">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить команду в основное меню</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add_to_main_menu_command.png</normaloff>:/img/icons/add_to_main_menu_command.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_2">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QFrame" name="frame_7">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <property name="bottomMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <item>
-              <widget class="QToolButton" name="tbAddTGCommand">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить команду меню</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/add_command.png</normaloff>:/img/icons/add_command.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbDeleteCommand">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Удалить команду меню</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/delete_command.png</normaloff>:/img/icons/delete_command.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbSaveCommands">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Сохранить команду</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/save_command.png</normaloff>:/img/icons/save_command.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbAddTGCommandToMainMenu">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить команду в основное меню</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/add_to_main_menu_command.png</normaloff>:/img/icons/add_to_main_menu_command.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_2">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QFrame" name="frame_7">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_11">
-             <property name="leftMargin">
-              <number>0</number>
-             </property>
-             <property name="topMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>0</number>
-             </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <item>
-              <widget class="QTreeView" name="tvAllCommands"/>
-             </item>
-            </layout>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QFrame" name="frCommandData">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_16">
-          <property name="spacing">
-           <number>0</number>
+             <layout class="QVBoxLayout" name="verticalLayout_11">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QTreeView" name="tvAllCommands"/>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QFrame" name="frCommandData">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="leftMargin">
-           <number>0</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
+          <layout class="QVBoxLayout" name="verticalLayout_16">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
@@ -470,7 +499,7 @@
       <attribute name="title">
        <string>События</string>
       </attribute>
-      <layout class="QHBoxLayout" name="horizontalLayout_5" stretch="2,3">
+      <layout class="QHBoxLayout" name="horizontalLayout_5">
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -484,201 +513,204 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QFrame" name="frame_8">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
+        <widget class="QSplitter" name="spltEventsConfig">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_17">
-          <property name="leftMargin">
-           <number>2</number>
+         <widget class="QFrame" name="frame_8">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>2</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>2</number>
-          </property>
-          <property name="bottomMargin">
-           <number>2</number>
-          </property>
-          <item>
-           <widget class="QFrame" name="frame_10">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_6">
-             <property name="leftMargin">
-              <number>0</number>
+          <layout class="QVBoxLayout" name="verticalLayout_17">
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>2</number>
+           </property>
+           <item>
+            <widget class="QFrame" name="frame_10">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <property name="topMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <property name="bottomMargin">
-              <number>2</number>
-             </property>
-             <item>
-              <widget class="QToolButton" name="tbAddTGEvent">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить событие по изменению тэга</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/add_event.png</normaloff>:/img/icons/add_event.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbAddScheduleEvent">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить периодическое событие</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/add_sch_event.png</normaloff>:/img/icons/add_sch_event.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>31</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbDeleteEvent">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Удалить событие</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/delete_event.png</normaloff>:/img/icons/delete_event.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbSaveEvents">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Сохранить событие</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/save_event.png</normaloff>:/img/icons/save_event.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_3">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QTreeView" name="tvAllEvents"/>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QFrame" name="frEventsData">
-         <property name="minimumSize">
-          <size>
-           <width>300</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_19">
-          <property name="spacing">
-           <number>6</number>
+             <layout class="QHBoxLayout" name="horizontalLayout_6">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <item>
+               <widget class="QToolButton" name="tbAddTGEvent">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить событие по изменению тэга</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add_event.png</normaloff>:/img/icons/add_event.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbAddScheduleEvent">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить периодическое событие</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/add_sch_event.png</normaloff>:/img/icons/add_sch_event.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>31</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbDeleteEvent">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Удалить событие</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/delete_event.png</normaloff>:/img/icons/delete_event.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbSaveEvents">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Сохранить событие</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/save_event.png</normaloff>:/img/icons/save_event.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_3">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTreeView" name="tvAllEvents"/>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QFrame" name="frEventsData">
+          <property name="minimumSize">
+           <size>
+            <width>300</width>
+            <height>0</height>
+           </size>
           </property>
-          <property name="leftMargin">
-           <number>0</number>
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>0</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
+          <layout class="QVBoxLayout" name="verticalLayout_19">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
@@ -687,10 +719,7 @@
       <attribute name="title">
        <string>Встраиваемые кнопки</string>
       </attribute>
-      <layout class="QHBoxLayout" name="horizontalLayout_10" stretch="2,3">
-       <property name="spacing">
-        <number>6</number>
-       </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_8">
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -704,190 +733,193 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QFrame" name="frame_11">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
+        <widget class="QSplitter" name="spltInlineButtons">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_21">
-          <property name="leftMargin">
-           <number>2</number>
+         <widget class="QFrame" name="frame_11">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>2</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>2</number>
-          </property>
-          <property name="bottomMargin">
-           <number>2</number>
-          </property>
-          <item>
-           <widget class="QFrame" name="frame_13">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_11">
-             <property name="leftMargin">
-              <number>0</number>
+          <layout class="QVBoxLayout" name="verticalLayout_21">
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>2</number>
+           </property>
+           <item>
+            <widget class="QFrame" name="frame_13">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <property name="topMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <property name="bottomMargin">
-              <number>2</number>
+             <layout class="QHBoxLayout" name="horizontalLayout_11">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <item>
+               <widget class="QToolButton" name="tbAddTGInlineButton">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Добавить встраиваемую кнопку</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/inline_btns_add.png</normaloff>:/img/icons/inline_btns_add.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbDeleteInlineButton">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Удалить встраивамю кнопку</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/inline_btns_delete.png</normaloff>:/img/icons/inline_btns_delete.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="tbSaveInlineButtons">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>40</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Сохранить встраиваемую кнопку</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="res.qrc">
+                  <normaloff>:/img/icons/inline_btns_save.png</normaloff>:/img/icons/inline_btns_save.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_4">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QFrame" name="frame_14">
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
              </property>
-             <item>
-              <widget class="QToolButton" name="tbAddTGInlineButton">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Добавить встраиваемую кнопку</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/inline_btns_add.png</normaloff>:/img/icons/inline_btns_add.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbDeleteInlineButton">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Удалить встраивамю кнопку</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/inline_btns_delete.png</normaloff>:/img/icons/inline_btns_delete.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="tbSaveInlineButtons">
-               <property name="minimumSize">
-                <size>
-                 <width>40</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>Сохранить встраиваемую кнопку</string>
-               </property>
-               <property name="text">
-                <string>...</string>
-               </property>
-               <property name="icon">
-                <iconset resource="res.qrc">
-                 <normaloff>:/img/icons/inline_btns_save.png</normaloff>:/img/icons/inline_btns_save.png</iconset>
-               </property>
-               <property name="iconSize">
-                <size>
-                 <width>30</width>
-                 <height>30</height>
-                </size>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_4">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QFrame" name="frame_14">
-            <property name="frameShape">
-             <enum>QFrame::Shape::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Raised</enum>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_22">
-             <property name="leftMargin">
-              <number>2</number>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <property name="topMargin">
-              <number>2</number>
-             </property>
-             <property name="rightMargin">
-              <number>2</number>
-             </property>
-             <property name="bottomMargin">
-              <number>2</number>
-             </property>
-             <item>
-              <widget class="QTreeView" name="tvAllInlineButtons"/>
-             </item>
-            </layout>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QFrame" name="frInlineButtonData">
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_23">
-          <property name="leftMargin">
-           <number>0</number>
+             <layout class="QVBoxLayout" name="verticalLayout_22">
+              <property name="leftMargin">
+               <number>2</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="rightMargin">
+               <number>2</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <item>
+               <widget class="QTreeView" name="tvAllInlineButtons"/>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QFrame" name="frInlineButtonData">
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
           </property>
-          <property name="topMargin">
-           <number>0</number>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
+          <layout class="QVBoxLayout" name="verticalLayout_23">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
