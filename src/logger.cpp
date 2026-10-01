@@ -15,10 +15,51 @@ const std::unordered_map<QtMsgType, QString> Logger::type_names_ = {
 
 unsigned int Logger::max_size_ = 200000; //200kb
 
-QString Logger::file_name_ = "new_log.txt";
+QString Logger::file_name_ = QString("new_log.txt");
 QString Logger::app_directory_{};
 
+std::optional<QtMsgType> Logger::min_level_ = std::nullopt;
+
 QMutex Logger::logger_mtx_{};
+
+int Logger::severity_rank_(QtMsgType type)
+{
+    switch(type) {
+    case QtMsgType::QtDebugMsg:    return 0;
+    case QtMsgType::QtInfoMsg:     return 1;
+    case QtMsgType::QtWarningMsg:  return 2;
+    case QtMsgType::QtCriticalMsg: return 3;
+    case QtMsgType::QtFatalMsg:    return 4;
+    }
+    return 0;
+}
+
+bool Logger::should_log_(QtMsgType type, const QMessageLogContext &context)
+{
+    if(!min_level_.has_value()) return true; // фильтр выключен -- пропускаем всё как есть
+
+    QString category = QString::fromUtf8(context.category ? context.category : "");
+    if(!category.isEmpty() && category != QStringLiteral("default")) return false;
+
+    return severity_rank_(type) >= severity_rank_(min_level_.value());
+}
+
+void Logger::SetMinLevel(std::optional<QtMsgType> level)
+{
+    QMutexLocker locker(&logger_mtx_);
+    min_level_ = level;
+}
+
+std::optional<QtMsgType> Logger::MinLevelFromString(const QString &str)
+{
+    QString s = str.trimmed();
+    if(s.compare("Debug", Qt::CaseInsensitive) == 0)    return QtMsgType::QtDebugMsg;
+    if(s.compare("Info", Qt::CaseInsensitive) == 0)     return QtMsgType::QtInfoMsg;
+    if(s.compare("Warning", Qt::CaseInsensitive) == 0)  return QtMsgType::QtWarningMsg;
+    if(s.compare("Critical", Qt::CaseInsensitive) == 0) return QtMsgType::QtCriticalMsg;
+    if(s.compare("Fatal", Qt::CaseInsensitive) == 0)    return QtMsgType::QtFatalMsg;
+    return std::nullopt; // "None" и любое нераспознанное значение -- без фильтрации
+}
 
 void Logger::check_and_rename_()
 {
@@ -92,6 +133,11 @@ void Logger::SetMaxSize(unsigned int new_size)
 void Logger::LogMessage(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
     QMutexLocker locker(&logger_mtx_);
+
+    if(!should_log_(type, context)) {
+        return;
+    }
+
     check_and_rename_();
 
     if(original_handler_) {

@@ -4,45 +4,46 @@
 #include <QLineEdit>
 #include <QItemSelection>
 
-#include "opcdatamanager.h"
 #include "plaintextconsole.h"
-#include "opctag.h"
 #include "opctagpostprocessingwidget.h"
+#include "sourcedrivers/sourcedrivermanager.h"
+#include "datatagregistry.h"
+#include "datatag.h"
 
-using namespace OPC_HELPER;
+using namespace Qt::StringLiterals;
 
-OPCValuesViewer::OPCValuesViewer(OPC_HELPER::OPCDataManager* dm_ptr, QWidget *parent)
+OPCValuesViewer::OPCValuesViewer(SourceDriverManager* dm_ptr, QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::OPCValuesViewer)
-    , opc_data_manager_(dm_ptr)
+    , driver_manager_(dm_ptr)
 {
     ui->setupUi(this);
-    QObject::connect(opc_data_manager_, SIGNAL(sg_periodic_started()), this, SLOT(sl_periodic_thread_started()));
-    QObject::connect(opc_data_manager_, SIGNAL(sg_periodic_finished()), this, SLOT(sl_periodic_thread_finished()));
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_periodic_started, this, &OPCValuesViewer::sl_periodic_thread_started);
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_periodic_finished, this, &OPCValuesViewer::sl_periodic_thread_finished);
 
-    ui->spbPeriodReading->setValue(opc_data_manager_->GetPeriodReading());
-    if(opc_data_manager_->PeriodicReadingOn()) {
+    ui->spbPeriodReading->setValue(driver_manager_->GetPeriodReading());
+    if(driver_manager_->InWork()) {
         ui->pbStartOPC->setEnabled(false);
     } else {
         ui->pbStartOPC->setEnabled(true);
     }
 
-    opc_values_viewer_model_ = new OPCValuesViewerModel(opc_data_manager_->GetIdToTagPeriodicTags(), this);
+    opc_values_viewer_model_ = new OPCValuesViewerModel(driver_manager_, driver_manager_->TagRegistry()->GetIdToTagsMap(), this);
     ui->tvOPCValuesViewer->setModel(opc_values_viewer_model_);
     ui->tvOPCValuesViewer->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tvOPCValuesViewer->verticalHeader()->hide();
     ui->tvOPCValuesViewer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
-    QObject::connect(ui->tvOPCValuesViewer, SIGNAL(clicked(QModelIndex)), opc_values_viewer_model_, SLOT(sl_table_view_cell_clicked(QModelIndex)));
-    QObject::connect(ui->tvOPCValuesViewer, SIGNAL(doubleClicked(QModelIndex)), opc_values_viewer_model_, SLOT(sl_table_view_cell_double_clicked(QModelIndex)));
-    QObject::connect(ui->tvOPCValuesViewer->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)), this, SLOT(sl_item_comment_processing(QItemSelection,QItemSelection)));
-    QObject::connect(opc_data_manager_, SIGNAL(sg_reading_periodic_complete()), opc_values_viewer_model_, SLOT(sl_tags_values_updated()));
-    QObject::connect(opc_data_manager_, SIGNAL(sg_reading_request_complete()), opc_values_viewer_model_, SLOT(sl_tags_values_updated()));
-    QObject::connect(opc_data_manager_, SIGNAL(sg_periodic_list_changed()), this, SLOT(sl_periodic_tags_list_changed()));
-    QObject::connect(ui->pbReadOnce, SIGNAL(clicked(bool)), this, SLOT(sl_pb_readonce_clicked()));
-    QObject::connect(ui->spbPeriodReading, SIGNAL(valueChanged(int)), this, SLOT(sl_spb_periodreading_valuechanged(int)));
-    QObject::connect(ui->pbStartOPC, SIGNAL(clicked(bool)), this, SLOT(sl_pb_startopc_clicked()));
-    QObject::connect(ui->pbStopOPC, SIGNAL(clicked(bool)), this, SLOT(sl_pb_stopopc_clicked()));
+    QObject::connect(ui->tvOPCValuesViewer, &QAbstractItemView::clicked, opc_values_viewer_model_, &OPCValuesViewerModel::sl_table_view_cell_clicked);
+    QObject::connect(ui->tvOPCValuesViewer, &QAbstractItemView::doubleClicked, opc_values_viewer_model_, &OPCValuesViewerModel::sl_table_view_cell_double_clicked);
+    QObject::connect(ui->tvOPCValuesViewer->selectionModel(), &QItemSelectionModel::selectionChanged, this, &OPCValuesViewer::sl_item_comment_processing);
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_reading_periodic_complete, opc_values_viewer_model_, &OPCValuesViewerModel::sl_tags_values_updated);
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_reading_request_complete, opc_values_viewer_model_, &OPCValuesViewerModel::sl_tags_values_updated);
+    QObject::connect(driver_manager_->TagRegistry(), &DataTagRegistry::sg_periodic_list_changed, this, &OPCValuesViewer::sl_periodic_tags_list_changed);
+    QObject::connect(ui->pbReadOnce, &QAbstractButton::clicked, this, &OPCValuesViewer::sl_pb_readonce_clicked);
+    QObject::connect(ui->spbPeriodReading, &QSpinBox::valueChanged, this, &OPCValuesViewer::sl_spb_periodreading_valuechanged);
+    QObject::connect(ui->pbStartOPC, &QAbstractButton::clicked, this, &OPCValuesViewer::sl_pb_startopc_clicked);
+    QObject::connect(ui->pbStopOPC, &QAbstractButton::clicked, this, &OPCValuesViewer::sl_pb_stopopc_clicked);
 
     console_ = new PlainTextConsole(this);
     console_->setMaximumBlockCount(100);
@@ -50,7 +51,7 @@ OPCValuesViewer::OPCValuesViewer(OPC_HELPER::OPCDataManager* dm_ptr, QWidget *pa
     ui->frOPCConsole->setLayout(new QVBoxLayout());
     ui->frOPCConsole->layout()->setContentsMargins(0, 0, 0, 0);
     ui->frOPCConsole->layout()->addWidget(console_);
-    QObject::connect(opc_data_manager_, SIGNAL(sg_send_message_to_console(QString)), console_, SLOT(sl_add_text_to_console(QString)));
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_send_message_to_console, console_, &PlainTextConsole::sl_add_text_to_console);
 }
 
 OPCValuesViewer::~OPCValuesViewer()
@@ -93,8 +94,8 @@ void OPCValuesViewer::showEvent(QShowEvent* event) {
 
 void OPCValuesViewer::sl_pb_readonce_clicked()
 {
-    auto vec_per = opc_data_manager_->GetPeriodicTags();
-    opc_data_manager_->ReadTagsOnce(vec_per);
+    auto vec_per = driver_manager_->TagRegistry()->GetAllTags();
+    driver_manager_->ReadTagsOnce(vec_per);
 }
 
 void OPCValuesViewer::sl_item_comment_processing(QItemSelection selected, QItemSelection deselected) {
@@ -120,12 +121,12 @@ void OPCValuesViewer::sl_item_comment_processing(QItemSelection selected, QItemS
 
 void OPCValuesViewer::sl_spb_periodreading_valuechanged(int arg1)
 {
-    opc_data_manager_->SetPeriodReading(arg1);
+    driver_manager_->SetPeriodReading(arg1);
 }
 
 void OPCValuesViewer::sl_pb_startopc_clicked()
 {
-    opc_data_manager_->StartPeriodReading(ui->spbPeriodReading->value());
+    driver_manager_->StartPeriodReading(ui->spbPeriodReading->value());
 }
 
 void OPCValuesViewer::sl_periodic_thread_started() {
@@ -142,23 +143,29 @@ void OPCValuesViewer::sl_periodic_thread_finished() {
 
 void OPCValuesViewer::sl_pb_stopopc_clicked()
 {
-    opc_data_manager_->StopPeriodReading();
+    driver_manager_->StopPeriodReading();
 }
 
 void OPCValuesViewer::sl_periodic_tags_list_changed()
 {
-    opc_values_viewer_model_->SetTagsToTable(opc_data_manager_->GetIdToTagPeriodicTags());
+    opc_values_viewer_model_->SetTagsToTable(driver_manager_->TagRegistry()->GetIdToTagsMap());
+}
+
+void OPCValuesViewer::sl_get_message_to_console(QString mes)
+{
+    console_->sl_add_text_to_console(mes);
 }
 
 //====================================================================================
 //================= O P C V a l u e W r i t e D i a l o g ============================
 //====================================================================================
 
-OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr, QWidget *parent)
+OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<DataTag> tag_ptr, SourceDriverManager* driver_manager, QWidget *parent)
     : QDialog(parent, Qt::Dialog)
     , tag_ptr_(tag_ptr)
+    , driver_manager_(driver_manager)
 {
-    setWindowTitle("Значение для записи");
+    setWindowTitle(u"Значение для записи"_s);
     QVBoxLayout* vbla = new QVBoxLayout();
     le_value_ = new QLineEdit();
     le_value_->setAlignment(Qt::AlignCenter);
@@ -166,7 +173,7 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<OPC_HELPER::OPCTag> tag
 
     QValidator* le_validator = nullptr;
     if(tag_ptr_) {
-        if(!le_validator && tag_ptr_->ValueIsReal()) le_validator = new QDoubleValidator(-10000.0, 10000.0, 1);
+        if(!le_validator && tag_ptr_->ValueIsReal()) le_validator = new QDoubleValidator(-10000.0, 10000.0, 4);
         if(!le_validator && tag_ptr_->ValueIsInteger()) le_validator = new QIntValidator(-10000, 10000);
         if(!le_validator && tag_ptr_->ValueIsUnsignedInteger()) le_validator = new QIntValidator(0, 10000);
         if(!le_validator && tag_ptr_->ValueIsBool()) le_validator = new QIntValidator(0,1);
@@ -174,11 +181,11 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<OPC_HELPER::OPCTag> tag
     }
     le_value_->setValidator(le_validator);
 
-    QPushButton* ok_btn = new QPushButton("OK");
-    QObject::connect(ok_btn, SIGNAL(pressed()), this, SLOT(sl_set_value_to_tag_and_close()));
+    QPushButton* ok_btn = new QPushButton(u"OK"_s);
+    QObject::connect(ok_btn, &QAbstractButton::pressed, this, &OPCValueWriteDialog::sl_set_value_to_tag_and_close);
 
-    QPushButton* cancel_btn = new QPushButton("Отмена");
-    QObject::connect(cancel_btn, SIGNAL(pressed()), this, SLOT(close()));
+    QPushButton* cancel_btn = new QPushButton(u"Отмена"_s);
+    QObject::connect(cancel_btn, &QAbstractButton::pressed, this, &QWidget::close);
     QHBoxLayout* hbla = new QHBoxLayout();
     hbla->addWidget(ok_btn);
     hbla->addWidget(cancel_btn);
@@ -191,27 +198,28 @@ OPCValueWriteDialog::OPCValueWriteDialog(std::shared_ptr<OPC_HELPER::OPCTag> tag
 void OPCValueWriteDialog::sl_set_value_to_tag_and_close()
 {
     if(tag_ptr_) {
-        OPC_HELPER::OpcValueType val;
+        std::optional<ValueVariant> val;
         if(tag_ptr_->ValueIsReal()) {
             bool b = false;
-            double dblVal = 0.0;
-            dblVal = le_value_->text().toDouble(&b);
+            double dblVal = QString(le_value_->text()).replace(u',', u'.').toDouble(&b);
             if(b) val = dblVal;
-        }
-        if(tag_ptr_->ValueIsInteger() || tag_ptr_->ValueIsBool()) {
+        } else if(tag_ptr_->ValueIsInteger() || tag_ptr_->ValueIsBool()) {
             bool b = false;
-            double intVal = 0.0;
-            intVal = le_value_->text().toInt(&b);
+            int64_t intVal = le_value_->text().toLongLong(&b);
             if(b) val = intVal;
-        }
-        if(tag_ptr_->ValueIsUnsignedInteger()) {
+        } else if(tag_ptr_->ValueIsUnsignedInteger()) {
             bool b = false;
-            double uintVal = 0.0;
-            uintVal = le_value_->text().toUInt(&b);
+            int64_t uintVal = le_value_->text().toULongLong(&b);
             if(b) val = uintVal;
+        } else if(tag_ptr_->ValueIsString()) {
+            val = le_value_->text();
         }
-        if(!val.valueless_by_exception()) {
-            tag_ptr_->SetValueToWrite(val);
+
+        if(val.has_value()) {
+            tag_ptr_->SetValueToWrite(val.value());
+            if(driver_manager_) {
+                driver_manager_->WriteTagNow(tag_ptr_);
+            }
         }
     }
     close();
@@ -222,23 +230,25 @@ void OPCValueWriteDialog::sl_set_value_to_tag_and_close()
 //================= O P C V a l u e s V i e w e r M o d e l ==========================
 //====================================================================================
 
-OPCValuesViewerModel::OPCValuesViewerModel(QObject *parent): QAbstractTableModel(parent)
+OPCValuesViewerModel::OPCValuesViewerModel(SourceDriverManager* driver_manager, QObject *parent)
+    : QAbstractTableModel(parent)
+    , driver_manager_(driver_manager)
 {
 
 }
 
-OPCValuesViewerModel::OPCValuesViewerModel(std::map<size_t, std::shared_ptr<OPC_HELPER::OPCTag> > &&tags_map, QObject *parent)
+OPCValuesViewerModel::OPCValuesViewerModel(SourceDriverManager* driver_manager, const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map, QObject* parent)
     : QAbstractTableModel(parent)
-    , id_to_tag_(std::move(tags_map))
+    , driver_manager_(driver_manager)
+    , id_to_tag_(tags_map)
 {
     auto ids_view = std::views::keys(id_to_tag_);
     id_tags_ordered_ = {ids_view.begin(), ids_view.end()};
 }
 
-void OPCValuesViewerModel::SetTagsToTable(std::map<size_t, std::shared_ptr<OPC_HELPER::OPCTag> > &&tags_map)
+void OPCValuesViewerModel::SetTagsToTable(const std::unordered_map<size_t, std::shared_ptr<DataTag>>& tags_map)
 {
-
-    id_to_tag_ = std::move(tags_map);
+    id_to_tag_ = tags_map;
     auto ids_view = std::views::keys(id_to_tag_);
     id_tags_ordered_ = {ids_view.begin(), ids_view.end()};
     reset();
@@ -269,7 +279,7 @@ QVariant OPCValuesViewerModel::data(const QModelIndex &index, int role) const
             size_t id = id_tags_ordered_.at(index.row());
             if(id_to_tag_.count(id) == 0 || !id_to_tag_.at(id)) return {};
             auto tag_ptr = id_to_tag_.at(id);
-            bool tag_has_modificators = (tag_ptr->GetGainOption().has_value()) || (tag_ptr->GetEnumStringValues().size() > 0);
+            bool tag_has_modificators = (tag_ptr->GetGainOption().has_value()) || (tag_ptr->GetSubstituteStringValues().size() > 0);
             return tag_has_modificators ? QBrush(QColor(114, 255, 138)) : QBrush(QColor(245, 245, 245));
             /* {background-color: #72FF8A;} : {background-color: #F5F5F5;} */
         }
@@ -299,9 +309,9 @@ QVariant OPCValuesViewerModel::get_column_data_from_tag_(const QModelIndex &inde
     case 1: return tag_ptr->GetTagName();
     case 2: return tag_ptr->GetStringType();
     case 3: return tag_ptr->GetStringValue();
-    case 4: return OPC_HELPER::GetQualityString(tag_ptr->GetTagQuality());
+    case 4: return DataTag::QualityToString(tag_ptr->GetTagQuality());
     case 5: {
-        bool tag_has_modificators = (tag_ptr->GetGainOption().has_value()) || (tag_ptr->GetEnumStringValues().size() > 0);
+        bool tag_has_modificators = (tag_ptr->GetGainOption().has_value()) || (tag_ptr->GetSubstituteStringValues().size() > 0);
         return tag_has_modificators ? QString("ОБРАБОТКА") : QString("НЕТ");
        }
     }
@@ -337,7 +347,7 @@ void OPCValuesViewerModel::reset()
     QAbstractTableModel::endResetModel();
 }
 
-OPCTag *OPCValuesViewerModel::GetTagPtr(const QModelIndex &index) const
+DataTag *OPCValuesViewerModel::GetTagPtr(const QModelIndex &index) const
 {
     if(!index.isValid() || index.row() >= static_cast<int>(id_tags_ordered_.size())) return nullptr;
     if(id_to_tag_.count(id_tags_ordered_.at(index.row())) == 0) return nullptr;
@@ -368,7 +378,7 @@ void OPCValuesViewerModel::sl_table_view_cell_double_clicked(const QModelIndex &
         if(id_to_tag_.count(id_tags_ordered_.at(index.row())) == 0 || !id_to_tag_.at(id_tags_ordered_.at(index.row()))) return;
         auto tag_ptr = id_to_tag_.at(id_tags_ordered_.at(index.row()));
 
-        OPCValueWriteDialog* set_value_dialog = new OPCValueWriteDialog(tag_ptr);
+        OPCValueWriteDialog* set_value_dialog = new OPCValueWriteDialog(tag_ptr, driver_manager_);
         set_value_dialog->exec();
         set_value_dialog->deleteLater();
     }
@@ -377,7 +387,7 @@ void OPCValuesViewerModel::sl_table_view_cell_double_clicked(const QModelIndex &
 void OPCValuesViewerModel::sl_tags_values_updated()
 {
     if(rowCount(QModelIndex()) == 0) return;
-    auto index_start = createIndex(0, 2);
+    auto index_start = createIndex(0, 1);
     auto index_end = createIndex(rowCount(QModelIndex()) - 1, 4);
     emit dataChanged(index_start, index_end, {Qt::DisplayRole});
 }

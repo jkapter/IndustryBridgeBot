@@ -9,29 +9,37 @@
 #include <QPushButton>
 #include <QThread>
 #include <QMutex>
+#include <QComboBox>
 
 #include "plaintextconsole.h"
-#include "copcclient.h"
-#include "opcdatamanager.h"
-#include "opcclientworker.h"
+#include "sourcedrivers/copcclient.h"
+#include "sourcedrivers/opcclientworker.h"
+#include "sourcedrivers/sourcedrivermanager.h"
+#include "datatagregistry.h"
 
 using namespace Qt::Literals::StringLiterals;
 
-OpcBrowseWidget::OpcBrowseWidget(OPC_HELPER::OPCDataManager* dm_ptr, QWidget *parent)
+OpcBrowseWidget::OpcBrowseWidget(SourceDriverManager* dm_ptr, QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::OpcBrowseWidget)
-    , opc_data_manager_(dm_ptr)
+    , driver_manager_(dm_ptr)
+    , data_model_(new DataBrowserTreeModel(this))
 {
     ui->setupUi(this);
 
     ui->tblvOPCTags->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     ui->tblvOPCTags->setItemDelegateForColumn(1, new SelectReadModeCheckBox(25, this));
-    ui->tblvOPCTags->setSelectionMode(QAbstractItemView::NoSelection);
+    ui->tblvOPCTags->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->tblvOPCTags->setModel(new OPCTagsViewerModel(nullptr, u""_s, driver_manager_, ui->tblvOPCTags));
+    ui->tblvOPCTags->horizontalHeader()->setStretchLastSection(false);
+    ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
+    ui->tblvOPCTags->horizontalHeader()->resizeSection(1, 120);
 
-    QObject::connect(ui->twOPCServers, SIGNAL(currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)), this, SLOT(sl_refresh_opc_tags_to_table(QTreeWidgetItem*,QTreeWidgetItem*)));
-    QObject::connect(ui->tbClearTagsList, SIGNAL(clicked(bool)), this, SLOT(sl_tb_cleartagslist_clicked()));
-    QObject::connect(ui->tbRefreshOPCList, SIGNAL(clicked(bool)), this, SLOT(sl_tb_refreshopclist_clicked()));
-    QObject::connect(ui->tbRefreshOPCTags, SIGNAL(clicked(bool)), this, SLOT(sl_tb_refreshopctags_clicked()));
+    QObject::connect(ui->tbCheckAll, &QAbstractButton::clicked, this, &OpcBrowseWidget::sl_tb_set_all_tags_clicked);
+    QObject::connect(ui->tbDeleteAll, &QAbstractButton::clicked, this, &OpcBrowseWidget::sl_tb_delete_all_tags_clicked);
+    QObject::connect(ui->tbAddDataSource, &QAbstractButton::clicked, this, &OpcBrowseWidget::sl_add_endpoint_to_tree);
+    QObject::connect(ui->tbDeleteDataSource, &QAbstractButton::clicked, this, &OpcBrowseWidget::sl_delete_endpoint_from_tree);
 
     console_ = new PlainTextConsole(this);
     console_->setMaximumBlockCount(100);
@@ -40,397 +48,432 @@ OpcBrowseWidget::OpcBrowseWidget(OPC_HELPER::OPCDataManager* dm_ptr, QWidget *pa
     ui->frOPCConsole->layout()->setContentsMargins(0, 0, 0, 0);
     ui->frOPCConsole->layout()->addWidget(console_);
 
-    ui->twOPCServers->setContextMenuPolicy(Qt::CustomContextMenu);
-    QObject::connect(ui->twOPCServers, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(sl_opc_servers_tree_widget_context_menu_requested(QPoint)));
-    QObject::connect(ui->twOPCServers, &QTreeView::expanded, this, [this](){ui->twOPCServers->resizeColumnToContents(0);});
-    ui->twOPCServers->setSortingEnabled(false);
+    QObject::connect(this, &OpcBrowseWidget::sg_send_message_to_console, console_, &PlainTextConsole::sl_add_text_to_console);
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_send_message_to_console, console_, &PlainTextConsole::sl_add_text_to_console);
 
-    OPC_HELPER::COPCClient opc_client;
-    QObject::connect(&opc_client, SIGNAL(sg_send_message_to_console(QString)), console_, SLOT(sl_add_text_to_console(QString)));
+    auto *proxy_tree_model_ptr = new DataBrowserFilterProxyModel(this);
+    proxy_tree_model_ptr->setSourceModel(data_model_);
+    ui->tvOPCTree->setModel(proxy_tree_model_ptr);
 
-    for(const auto& it: opc_data_manager_->GetHostNames()) {
-        auto host_it = host_names_.insert(it).first;
-        host_to_opc_servers_[&(*host_it)] = {};
-    }
+    ui->tvOPCTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->tvOPCTree->setSortingEnabled(false);
+    ui->tvOPCTree->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->tvOPCTree->header()->setStretchLastSection(false);
+    ui->tvOPCTree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    ui->tvOPCTree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    ui->tvOPCTree->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    ui->tvOPCTree->header()->setResizeContentsPrecision(0);
+    ui->tvOPCTree->header()->hide();
+    QObject::connect(ui->tvOPCTree, &QWidget::customContextMenuRequested, this, &OpcBrowseWidget::sl_opc_servers_tree_widget_context_menu_requested);
+    QObject::connect(ui->tvOPCTree->selectionModel(), &QItemSelectionModel::currentChanged, this, &OpcBrowseWidget::sl_refresh_opc_tags_to_table);
 
-    if(!host_names_.contains(u"localhost"_s)) {
-        auto host_it = host_names_.insert(u"localhost"_s).first;
-        host_to_opc_servers_[&(*host_it)] = {};
-    }
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_get_part_tag_names_from_server, this, &OpcBrowseWidget::sl_browser_get_part_tags);
+    QObject::connect(driver_manager_, &SourceDriverManager::sg_get_all_tag_names_from_server, this, &OpcBrowseWidget::sl_browser_get_all_tags);
 
-    for(const auto& host: host_names_) {
-        for(const auto& it: opc_client.GetOPCServerNames(host)) {
-            auto [serv_it, b] = host_to_opc_servers_.at(&host).insert(it);
-            if(b) {
-                opc_server_to_mutex_[&(*serv_it)];
-                opc_server_to_table_model_[&(*serv_it)] = nullptr;
-            }
-        }
-    }
-    fill_opc_list_();    
+    construct_tree_on_start_();
 }
 
 OpcBrowseWidget::~OpcBrowseWidget()
 {
     emit sg_stop_browsing_tags();
-    while(opc_threads_count_ > 0) {
-        QThread::currentThread()->eventDispatcher()->processEvents(QEventLoop::AllEvents);
-        QThread::currentThread()->sleep(std::chrono::nanoseconds(100000));
-    }
     delete ui;
 }
 
-void OpcBrowseWidget::opctable_set_column_widths_() {
-    QTableView* opc_table_tags = ui->tblvOPCTags;
+void OpcBrowseWidget::construct_tree_on_start_()
+{
+    std::unordered_map<QString, std::unordered_set<QString>> host_to_endpoint;
+    std::unordered_map<QString, DataTag::DataSource> endpoint_to_source;
+    for(const auto& it: driver_manager_->TagRegistry()->GetAllTags()) {
+        data_model_->AddHost(it->GetHostName());
+        host_to_endpoint[it->GetHostName()].insert(it->GetEndpointName());
+        endpoint_to_source[it->GetEndpointName()] = it->GetDataSource();
+    }
 
-    int w_header = opc_table_tags->horizontalHeader()->geometry().width();
-    if(w_header <= 0) return;
-
-    int n_col = 2;
-    int w_btns_cols = w_header > 300 ? (60 * n_col) : w_header / 2;
-
-    for(int i = 0; i < n_col; ++i) {
-        if(i == 0) {
-            opc_table_tags->setColumnWidth(0, w_header - w_btns_cols);
-        } else {
-            opc_table_tags->setColumnWidth(i, w_btns_cols/(n_col-1));
+    for(auto& [host, ep_set]: host_to_endpoint) {
+        for(auto& ep: ep_set) {
+            sl_add_new_endpoint_to_tree(host, ep, static_cast<uint8_t>(endpoint_to_source.at(ep)));
         }
     }
-    ui->tblvOPCTags->repaint();
 }
 
 void OpcBrowseWidget::resizeEvent(QResizeEvent* event) {
-    opctable_set_column_widths_();
+
 }
 
 void OpcBrowseWidget::showEvent(QShowEvent* event) {
-    opctable_set_column_widths_();
+    int wdt = ui->splitter->width();
+    ui->splitter->setSizes({wdt/3, 2*wdt/3});
 }
 
-void OpcBrowseWidget::fill_opc_list_() {
-    QTreeWidget* opc_tree = ui->twOPCServers;
-    opc_tree->clear();
-    opc_server_to_tree_item_.clear();
+void OpcBrowseWidget::sl_refresh_opc_tags_to_table(const QModelIndex &current, const QModelIndex &previous) {
 
-    for(const auto& it: host_names_) {
-        QTreeWidgetItem* top_item;
-        if(it == u"localhost"_s) {
-            top_item = new QTreeWidgetItem({u"Этот компьютер"_s, u""_s}, QTreeWidgetItem::UserType);
-        } else {
-            top_item = new QTreeWidgetItem({it, u""_s});
+    selected_item_opc_tree_ = nullptr;
+
+    auto *proxy_model = qobject_cast<QSortFilterProxyModel*>(ui->tvOPCTree->model());
+    if (!proxy_model) return;
+
+    QModelIndex source_index = proxy_model->mapToSource(current);
+    if(!source_index.isValid()) return;
+
+    selected_item_opc_tree_ = static_cast<DataBrowseItem*>(source_index.internalPointer());
+    if(!selected_item_opc_tree_) return;
+
+    QString host;
+    QString endpoint;
+    DataBrowseItem* parent;
+
+    switch(selected_item_opc_tree_->GetType()) {
+        using enum DataBrowseItem::ItemType;
+    case HOST: return;
+    case INVALID: return;
+    case ROOT: return;
+    case ENDPOINT:
+        endpoint = selected_item_opc_tree_->GetId();
+        parent = selected_item_opc_tree_->ParentItem();
+        if(!parent || parent->GetType() != HOST) return;
+        host = parent->GetId();
+        if(!selected_item_opc_tree_->IsBrowsed()) {
+            DriverInterface * driver = driver_manager_->GetDriverPtr(selected_item_opc_tree_->GetSource());
+            if(!driver) return;
+            driver->GetVariablesNode(host, endpoint);
         }
-
-        for(const auto& server: host_to_opc_servers_.at(&it)) {
-            QTreeWidgetItem* child_item = new QTreeWidgetItem(top_item);
-            child_item->setText(0, server);
-            bool opc_list = opc_server_to_tags_list_buffer_.count(&server) > 0;
-            size_t tags_count = opc_list ? opc_server_to_tags_list_buffer_.at(&server).size() : 0;
-            child_item->setText(1, QString("[%1]").arg(tags_count));
-            QString icon_path = !opc_list ? u":/img/icons/question_mark_icon.png"_s : u":/img/icons/circle_green_checkmark.svg"_s;
-            QIcon item_icon(icon_path);
-            child_item->setIcon(0, item_icon);
-            opc_server_to_tree_item_[&server] = child_item;
+        break;
+    case NODE:
+        parent = selected_item_opc_tree_->ParentItem();
+        while(parent && parent->GetType() != ENDPOINT) {
+            parent = parent->ParentItem();
         }
-        opc_tree->addTopLevelItem(top_item);
+        endpoint = parent->GetId();
+        parent = parent->ParentItem();
+        if(!parent || parent->GetType() != HOST) return;
+        host = parent->GetId();
+        break;
+    case VARIABLE:
+        parent = selected_item_opc_tree_->ParentItem();
+        while(parent && parent->GetType() != ENDPOINT) {
+            parent = parent->ParentItem();
+        }
+        endpoint = parent->GetId();
+        parent = parent->ParentItem();
+        if(!parent || parent->GetType() != HOST) return;
+        host = parent->GetId();
+        break;
+    default: return;
     }
-    ui->twOPCServers->resizeColumnToContents(0);
+
+    auto old_model = ui->tblvOPCTags->model();
+    QString tag_prefix = QString("[%1][%2]").arg(host, endpoint);
+    ui->tblvOPCTags->setModel(new OPCTagsViewerModel(selected_item_opc_tree_, tag_prefix, driver_manager_, ui->tblvOPCTags));
+    ui->tblvOPCTags->horizontalHeader()->setStretchLastSection(false);
+    ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
+    ui->tblvOPCTags->horizontalHeader()->resizeSection(1, 120);
+    old_model->deleteLater();
 }
 
-void OpcBrowseWidget::fill_tags_list_(const QString& hostname, const QString& server_name) {
-    auto host_it = host_names_.find(hostname);
-    if(host_it == host_names_.end()) return;
-
-    auto server_it = host_to_opc_servers_.at(&(*host_it)).find(server_name);
-    if(server_it == host_to_opc_servers_.at(&(*host_it)).end()) return;
-
-    if(opc_server_to_tags_list_buffer_.count(&(*server_it)) == 0) {
-        opc_server_to_tags_list_buffer_[&(*server_it)] = {};
-
-        OPC_HELPER::OPCDATagBrowser* browser = new OPC_HELPER::OPCDATagBrowser(hostname, server_name, opc_server_to_tags_list_buffer_.at(&(*server_it)), opc_server_to_mutex_.at(&(*server_it)));
-        QThread* opc_thread = new QThread(this);
-        QObject::connect(browser, SIGNAL(sg_send_message_to_console(QString)), console_, SLOT(sl_add_text_to_console(QString)));
-        QObject::connect(browser, SIGNAL(sg_opcclient_got_exception(QString)), console_, SLOT(sl_add_text_to_console(QString)));
-        QObject::connect(this, SIGNAL(sg_stop_browsing_tags()), browser, SLOT(sl_stop_browsing()));
-        QObject::connect(opc_thread, SIGNAL(started()), browser, SLOT(sl_process()));
-        QObject::connect(browser, SIGNAL(sg_finished()), opc_thread, SLOT(quit()));
-        QObject::connect(opc_thread, SIGNAL(finished()), opc_thread, SLOT(deleteLater()));
-        QObject::connect(opc_thread, &QThread::finished, this, [this](){--opc_threads_count_;});
-        QObject::connect(browser, SIGNAL(sg_get_part_tag_names_from_server(const QString&,const QString&,size_t)), this, SLOT(sl_browser_get_part_tags(const QString&,const QString&,size_t)));
-        QObject::connect(browser, SIGNAL(sg_get_all_tag_names_from_server(const QString&,const QString&,size_t)), this, SLOT(sl_browser_get_all_tags(const QString&,const QString&,size_t)));
-        QObject::connect(opc_thread, &QThread::finished, [browser] {delete browser;});
-
-        browser->moveToThread(opc_thread);
-        opc_thread->start();
-        ++opc_threads_count_;
-        console_->sl_add_text_to_console(QString("Запрос списка тэгов сервера %1 на хосте %2.").arg(server_name, hostname));
-        return;
-    }
-
-    if(opc_server_to_mutex_.at(&(*server_it)).tryLock(1)) {
-        opc_server_to_mutex_.at(&(*server_it)).unlock();
-    } else {
-        return;
-    }
-
-    QTableView* opc_table_v = ui->tblvOPCTags;
-    QGuiApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-    QMutexLocker locker(&opc_server_to_mutex_.at(&(*server_it)));
-    const std::vector<QString>& tag_list = opc_server_to_tags_list_buffer_.at(&(*server_it));
-
-    if(!opc_server_to_table_model_.at(&(*server_it))) {
-        opc_server_to_table_model_.at(&(*server_it)) = new OPCTagsViewerModel(tag_list, QString("%1@%2").arg(*host_it, *server_it), *opc_data_manager_, this);
-    }
-    opc_table_v->setModel(opc_server_to_table_model_.at(&(*server_it)));
-
-    QGuiApplication::restoreOverrideCursor();
-    opctable_set_column_widths_();
-}
-
-void OpcBrowseWidget::sl_refresh_opc_tags_to_table(QTreeWidgetItem* cur, QTreeWidgetItem* last) {
-    ui->twOPCServers->resizeColumnToContents(0);
-    if(cur && cur->parent()) {
-        QString host = cur->parent()->text(0) == u"Этот компьютер"_s ? u"localhost"_s : cur->parent()->text(0);
-        fill_tags_list_(host, cur->text(0));
-        opctable_set_column_widths_();
-    }
-}
-
-void OpcBrowseWidget::sl_tb_cleartagslist_clicked()
+void OpcBrowseWidget::sl_tb_delete_all_tags_clicked()
 {
-    opc_data_manager_->ClearMonitoringTags();
-    ui->tblvOPCTags->repaint();
+    static_cast<OPCTagsViewerModel*>(ui->tblvOPCTags->model())->DeleteAllTags();
 }
 
-void OpcBrowseWidget::sl_tb_refreshopclist_clicked()
+void OpcBrowseWidget::sl_tb_set_all_tags_clicked()
 {
-    emit sg_stop_browsing_tags();
-    QThread::currentThread()->eventDispatcher()->processEvents(QEventLoop::AllEvents);
-
-    ui->twOPCServers->clear();
-    ui->tblvOPCTags->setModel(nullptr);
-
-    host_to_opc_servers_.clear();
-    opc_server_to_tree_item_.clear();
-
-    for(const auto& it: host_names_) {
-        OPC_HELPER::COPCClient opc_client;
-        QObject::connect(&opc_client, SIGNAL(sg_send_message_to_console(QString)), console_, SLOT(sl_add_text_to_console(QString)));
-        host_to_opc_servers_[&it] = {};
-        for(const auto& server: opc_client.GetOPCServerNames(it)) {
-            auto [serv_it, b] = host_to_opc_servers_.at(&it).insert(server);
-            if(b) {
-                opc_server_to_mutex_[&(*serv_it)];
-                opc_server_to_table_model_[&(*serv_it)] = nullptr;
-            }
-        }
-    }
-    fill_opc_list_();
-}
-
-void OpcBrowseWidget::sl_tb_refreshopctags_clicked()
-{
-    emit sg_stop_browsing_tags();
-    QThread::currentThread()->eventDispatcher()->processEvents(QEventLoop::AllEvents);
-
-    if(ui->twOPCServers->currentItem() && ui->twOPCServers->currentItem()->parent()) {
-        auto host_it = host_names_.find(ui->twOPCServers->currentItem()->parent()->text(0));
-        if(host_it == host_names_.end()) return;
-
-        auto server_it = host_to_opc_servers_.at(&(*host_it)).find(ui->twOPCServers->currentItem()->text(0));
-        if(server_it == host_to_opc_servers_.at(&(*host_it)).end()) return;
-
-        opc_server_to_tags_list_buffer_.erase(&(*server_it));
-        ui->tblvOPCTags->setModel(nullptr);
-        if(opc_server_to_table_model_.at(&(*server_it))) {
-            opc_server_to_table_model_.at(&(*server_it))->deleteLater();
-            opc_server_to_table_model_.at(&(*server_it)) = nullptr;
-        }
-        fill_tags_list_(*host_it, *server_it);
-    }
+    static_cast<OPCTagsViewerModel*>(ui->tblvOPCTags->model())->SetAllTagsToRead();
 }
 
 void OpcBrowseWidget::sl_opc_servers_tree_widget_context_menu_requested(const QPoint &pos)
 {
-    selected_item_opc_tree_ = ui->twOPCServers->itemAt(pos);
-    QAction *add_server = new QAction(u"Добавить сетевое расположение"_s, ui->twOPCServers);
-    QAction *delete_server = new QAction(u"Удалить"_s, ui->twOPCServers);
-    bool delete_allow = selected_item_opc_tree_ &&
-                        (
-                        (!selected_item_opc_tree_->parent() && (selected_item_opc_tree_->type() == QTreeWidgetItem::Type))
-                         ||(selected_item_opc_tree_->parent() && (selected_item_opc_tree_->parent()->type() == QTreeWidgetItem::Type))
-                        )
-                        ;
-    delete_server->setEnabled(delete_allow);
-    QObject::connect(add_server, SIGNAL(triggered()), this, SLOT(sl_add_opc_server_to_tree()));
-    QObject::connect(delete_server, SIGNAL(triggered()), this, SLOT(sl_delete_opc_server_from_tree()));
+    QAction add_endpoint(u"Добавить источник данных"_s, ui->tvOPCTree);
+    QAction delete_endpoint(u"Удалить"_s, ui->tvOPCTree);
 
-    QMenu context_menu(ui->twOPCServers);
-    context_menu.addAction(add_server);
+    bool delete_allow = false;
+    selected_item_opc_tree_ = nullptr;
+
+    QModelIndex proxy_index = ui->tvOPCTree->selectionModel()->currentIndex();
+
+    if (proxy_index.isValid()) {
+        auto *proxy_model = qobject_cast<QSortFilterProxyModel*>(ui->tvOPCTree->model());
+        if (proxy_model) {
+            QModelIndex source_index = proxy_model->mapToSource(proxy_index);
+            auto *item = static_cast<DataBrowseItem*>(source_index.internalPointer());
+            if (item) {
+                selected_item_opc_tree_ = item;
+                delete_allow = (item->GetType() == DataBrowseItem::ItemType::ENDPOINT || item->GetType() == DataBrowseItem::ItemType::HOST);
+            }
+        }
+    }
+
+    selected_item_opc_tree_ = delete_allow ? selected_item_opc_tree_ : nullptr;
+
+    delete_endpoint.setEnabled(delete_allow);
+    QObject::connect(&add_endpoint, &QAction::triggered, this, &OpcBrowseWidget::sl_add_endpoint_to_tree);
+    QObject::connect(&delete_endpoint, &QAction::triggered, this, &OpcBrowseWidget::sl_delete_endpoint_from_tree);
+
+    QMenu context_menu(ui->tvOPCTree);
+    context_menu.addAction(&add_endpoint);
     context_menu.addSeparator();
-    context_menu.addAction(delete_server);
-    context_menu.exec(ui->twOPCServers->mapToGlobal(pos));
+    context_menu.addAction(&delete_endpoint);
+    context_menu.exec(ui->tvOPCTree->mapToGlobal(pos));
 }
 
-void OpcBrowseWidget::sl_add_opc_server_to_tree()
+void OpcBrowseWidget::sl_add_endpoint_to_tree()
 {
-    OPCAddHostDialog* new_host_dialog = new OPCAddHostDialog(this);
-    QObject::connect(new_host_dialog, SIGNAL(sg_add_new_host(const QString&)),this, SLOT(sl_add_new_host_to_tree(const QString&)));
+    OPCAddHostDialog* new_host_dialog = new OPCAddHostDialog(driver_manager_, this);
+    QObject::connect(new_host_dialog, &OPCAddHostDialog::sg_add_new_endpoint, this, &OpcBrowseWidget::sl_add_new_endpoint_to_tree);
     new_host_dialog->exec();
     new_host_dialog->deleteLater();
 }
 
-void OpcBrowseWidget::sl_delete_opc_server_from_tree()
+void OpcBrowseWidget::sl_delete_endpoint_from_tree()
 {
-    if(selected_item_opc_tree_ && !selected_item_opc_tree_->parent() && selected_item_opc_tree_->text(0) != u"Этот компьютер"_s) {
-        emit sg_stop_browsing_tags();
-        auto host_it = host_names_.find(selected_item_opc_tree_->text(0));
-        ui->tblvOPCTags->setModel(nullptr);
-
-        for(auto& it: host_to_opc_servers_.at(&(*host_it))) {
-            while(!opc_server_to_mutex_.at(&it).tryLock(50)){};
-            opc_server_to_mutex_.at(&it).unlock();
-            opc_server_to_tags_list_buffer_.erase(&it);
-            opc_server_to_mutex_.erase(&it);
-            if(opc_server_to_table_model_.at(&it)) {
-                opc_server_to_table_model_.at(&it)->deleteLater();
-                opc_server_to_table_model_.at(&it) = nullptr;
-            }
-        }
-        host_to_opc_servers_.erase(&(*host_it));
-        host_names_.erase(host_it);
-        fill_opc_list_();
+    using enum DataBrowseItem::ItemType;
+    if(!selected_item_opc_tree_) return;
+    if(selected_item_opc_tree_->GetType() == ENDPOINT
+        || selected_item_opc_tree_->GetType() == HOST) {
+        auto old_model = ui->tblvOPCTags->model();
+        ui->tblvOPCTags->setModel(new OPCTagsViewerModel(nullptr, u""_s, driver_manager_, ui->tblvOPCTags));
+        ui->tblvOPCTags->horizontalHeader()->setStretchLastSection(false);
+        ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+        ui->tblvOPCTags->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
+        ui->tblvOPCTags->horizontalHeader()->resizeSection(1, 120);
+        old_model->deleteLater();
     }
+
+    if(selected_item_opc_tree_->GetType() == ENDPOINT) {
+        data_model_->DeleteEndpoint(selected_item_opc_tree_->ParentItem()->GetId(), selected_item_opc_tree_->GetId());
+    } else if(selected_item_opc_tree_->GetType() == HOST) {
+        data_model_->DeleteHost(selected_item_opc_tree_->GetId());
+    } else {
+        return;
+    }
+    selected_item_opc_tree_ = nullptr;
 }
 
-void OpcBrowseWidget::sl_add_new_host_to_tree(const QString& hostname)
+void OpcBrowseWidget::sl_add_new_endpoint_to_tree(QString hostname, QString endpoint, uint8_t data_source)
 {
-    auto [host_it, b] = host_names_.insert(hostname);
-    if(b) {
-        OPC_HELPER::COPCClient opc_client;
-        QObject::connect(&opc_client, SIGNAL(sg_send_message_to_console(QString)), console_, SLOT(sl_add_text_to_console(QString)));
-        host_to_opc_servers_[&(*host_it)] = {};
-        for(const auto& it: opc_client.GetOPCServerNames(hostname)) {
-            auto [serv_it, b] = host_to_opc_servers_.at(&(*host_it)).insert(it);
-            if(b) {
-                opc_server_to_mutex_[&(*serv_it)];
-                opc_server_to_table_model_[&(*serv_it)] = nullptr;
-            }
+    data_model_->AddHost(hostname);
+    auto host_node_ptr = data_model_->GetHost(hostname);
+
+    DataTag::DataSource src;
+
+    switch(data_source) {
+    case 1:
+        src = DataTag::DataSource::OPCDA;
+        break;
+    case 2:
+        src = DataTag::DataSource::OPCUA;
+        break;
+    default: return;
+    }
+
+    DriverInterface* driver = driver_manager_->GetDriverPtr(src);
+
+    if(!host_node_ptr->ChildByName(endpoint)) {
+        QString mes;
+        bool res = data_model_->AddEndpoint(hostname, endpoint, src);
+        mes = res ? u"Добавлен источник данных "_s : u"Не удалось добавить источник данных "_s;
+        mes.append(QString("[%1] к хосту [%2]").arg(endpoint, hostname));
+        emit sg_send_message_to_console(mes);
+
+        if(res) {
+            qInfo() << mes;
+        } else {
+            qWarning() << mes;
+            return;
         }
-        fill_opc_list_();
+    }
+
+    auto node = driver->GetVariablesNode(hostname, endpoint);
+    if(node) {
+        data_model_->AbsorbChildNodes(hostname, endpoint, node);
     }
 }
 
 void OpcBrowseWidget::sl_browser_get_part_tags(const QString& hostname, const QString& server_name, size_t n_tags)
 {
-    auto host_it = host_names_.find(hostname);
-    if(host_it == host_names_.end()) return;
-
-    auto server_it = host_to_opc_servers_.at(&(*host_it)).find(server_name);
-    if(server_it == host_to_opc_servers_.at(&(*host_it)).end()) return;
-
-    if(opc_server_to_tree_item_.count(&(*server_it)) > 0 && (opc_server_to_tree_item_.at(&(*server_it)))) {
-        opc_server_to_tree_item_.at(&(*server_it))->setText(1, QString("[%1]").arg(n_tags));
-        console_->sl_add_text_to_console(QString("Сервер %1, в сетевом расположении %2, прочитано %3 тэгов.")
-                                             .arg(server_name, hostname).arg(n_tags));
+    auto ep_node_ptr = data_model_->GetEndpoint(hostname, server_name);
+    if(!ep_node_ptr) {
+        QString mes = QString("Не найден источник данных [%1] на хосте [%2]").arg(server_name, hostname);
+        qWarning() << mes;
+        emit sg_send_message_to_console(mes);
+        return;
     }
+
+    QString mes = QString("Хост [%1] обзор источника данных [%2]. Получено [%3] тэгов.").arg(server_name, hostname).arg(n_tags);
+    qInfo() << mes;
+    emit sg_send_message_to_console(mes);
+
+    ep_node_ptr->SetTempVarCount(n_tags);
+    data_model_->sl_data_changed(hostname, server_name);
 }
 
 void OpcBrowseWidget::sl_browser_get_all_tags(const QString& hostname, const QString& server_name, size_t n_tags)
 {
-    auto host_it = host_names_.find(hostname);
-    if(host_it == host_names_.end()) return;
-
-    auto server_it = host_to_opc_servers_.at(&(*host_it)).find(server_name);
-    if(server_it == host_to_opc_servers_.at(&(*host_it)).end()) return;
-
-    if(opc_server_to_tree_item_.count(&(*server_it)) > 0 && (opc_server_to_tree_item_.at(&(*server_it)))) {
-        opc_server_to_tree_item_.at(&(*server_it))->setText(1, QString("[%1]").arg(n_tags));
-        opc_server_to_tree_item_.at(&(*server_it))->setIcon(0,  QIcon(u":/img/icons/circle_green_checkmark.svg"_s));
-        console_->sl_add_text_to_console(QString("Сервер %1, в сетевом расположении %2, прочитано все тэги.")
-                                             .arg(server_name, hostname));
-        ui->twOPCServers->setCurrentItem(opc_server_to_tree_item_.at(&(*server_it)));
-        fill_tags_list_(hostname, server_name);
-        opctable_set_column_widths_();
+    auto ep_node_ptr = data_model_->GetEndpoint(hostname, server_name);
+    if(!ep_node_ptr) {
+        QString mes = QString("Не найден источник данных [%1] на хосте [%2]").arg(server_name, hostname);
+        qWarning() << mes;
+        emit sg_send_message_to_console(mes);
+        return;
     }
-}
 
-//===============================================================
-//================ OPCCheckBoxTableItem =========================
-//===============================================================
+    QString mes = QString("Хост [%1] закончен обзор источник данных [%2]. Получено [%3] тэгов.").arg(server_name, hostname).arg(n_tags);
+    qInfo() << mes;
+    emit sg_send_message_to_console(mes);
 
-OPCCheckBoxTableItem::OPCCheckBoxTableItem(QString tag, OPC_HELPER::TAG_STATUS type, bool checked, QWidget *parent)
-    : QWidget(parent)
-    , tag_name_(tag)
-    , tag_place_(type)
-{
-    QHBoxLayout* hbox_la = new QHBoxLayout(this);
-    QCheckBox* chb_ = new QCheckBox(this);
-    hbox_la->addWidget(chb_);
-    hbox_la->setAlignment(Qt::AlignCenter);
-    hbox_la->setContentsMargins(0, 0, 0, 0);
-    chb_->setChecked(checked);
+    DriverInterface* driver = driver_manager_->GetDriverPtr(ep_node_ptr->GetSource());
 
-    QObject::connect(chb_, SIGNAL(stateChanged(int)), this, SLOT(sl_checkbox_changed_state(int)));
-}
+    auto node = driver->GetVariablesNode(hostname, server_name);
+    if(!node) return;
 
-void OPCCheckBoxTableItem::sl_checkbox_changed_state(int state) {
-    emit sg_change_state(tag_name_, tag_place_, state);
-}
-
-void OPCCheckBoxTableItem::SetCheckBoxState(bool state) {
-    chb_->setChecked(state);
+    data_model_->AbsorbChildNodes(hostname, server_name, node);
+    ep_node_ptr->SetBrowsed(true);
+    ep_node_ptr->UpdateItemRecursievly();
+    delete node;
 }
 
 //===============================================================
 //================ OPCAddServerDialog ===========================
 //===============================================================
 
-OPCAddHostDialog::OPCAddHostDialog(QWidget *parent)
+OPCAddHostDialog::OPCAddHostDialog(SourceDriverManager* driver_manager, QWidget *parent)
     : QDialog(parent, Qt::Dialog)
+    , driver_manager_(driver_manager)
 {
-    setWindowTitle("Добавить сетевое расположение");
-    QVBoxLayout* vbla = new QVBoxLayout();
+    setWindowTitle("Добавить источник данных");
+
+    QVBoxLayout* main_la = new QVBoxLayout(this);
+
+    QHBoxLayout* host_la = new QHBoxLayout();
     le_value_ = new QLineEdit();
     le_value_->setAlignment(Qt::AlignCenter);
+    le_value_->setFixedWidth(150);
+    QObject::connect(le_value_, &QLineEdit::editingFinished, this, [this](){});
 
-    QPushButton* ok_btn = new QPushButton("OK");
-    QObject::connect(ok_btn, SIGNAL(pressed()), this, SLOT(sl_ok_pressed()));
+    data_type_cb_ = new QComboBox();
+    data_type_cb_->addItem(u"OPC DA"_s);
+    data_type_cb_->addItem(u"OPC UA"_s);
+    data_type_cb_->setCurrentIndex(0);
+    QObject::connect(data_type_cb_, &QComboBox::currentIndexChanged, this, &OPCAddHostDialog::sl_data_type_changed);
 
+    QPushButton* get_ep_btn = new QPushButton("Обзор");
+    QObject::connect(get_ep_btn, &QAbstractButton::pressed, this, &OPCAddHostDialog::sl_get_ep_pressed);
+
+    host_la->addWidget(le_value_);
+    host_la->addWidget(data_type_cb_);
+    host_la->addWidget(get_ep_btn);
+    main_la->addLayout(host_la);
+
+    ep_combobox_ = new QComboBox();
+    main_la->addWidget(ep_combobox_);
+    ep_combobox_->setEnabled(false);
+
+    ok_btn_ = new QPushButton("OK");
+    ok_btn_->setEnabled(false);
+    QObject::connect(ok_btn_, &QAbstractButton::pressed, this, &OPCAddHostDialog::sl_ok_pressed);
     QPushButton* cancel_btn = new QPushButton("Отмена");
-    QObject::connect(cancel_btn, SIGNAL(pressed()), this, SLOT(close()));
-    QHBoxLayout* hbla = new QHBoxLayout();
-    hbla->addWidget(ok_btn);
-    hbla->addWidget(cancel_btn);
-    vbla->addWidget(le_value_);
-    vbla->addItem(hbla);
+    QObject::connect(cancel_btn, &QAbstractButton::pressed, this, &QWidget::close);
+    QHBoxLayout* buttons_la = new QHBoxLayout();
+    buttons_la->addStretch(1);
+    buttons_la->addWidget(ok_btn_);
+    buttons_la->addWidget(cancel_btn);
 
-    setLayout(vbla);
+
+    main_la->addLayout(buttons_la);
 }
 
 void OPCAddHostDialog::sl_ok_pressed()
 {
-    if(le_value_->text().length() > 0) {
-        emit sg_add_new_host(le_value_->text());
+    if(le_value_->text().length() > 0 && ep_combobox_->currentText().length() > 0) {
+        emit sg_add_new_endpoint(le_value_->text(), ep_combobox_->currentText(), data_type_cb_->currentIndex() + 1);
+        close();
     }
-    close();
+    ep_combobox_->setFocus();
 }
+
+void OPCAddHostDialog::sl_get_ep_pressed()
+{
+    if(!driver_manager_) return;
+
+    DriverInterface* driver = get_current_driver_();
+    if(!driver) return;
+
+    QObject::connect(driver, &DriverInterface::sg_get_endpoints_names,
+                     this, &OPCAddHostDialog::sl_endpoints_received_,
+                     Qt::UniqueConnection);
+
+    auto ep_set = driver->GetEndpointNames(le_value_->text());
+    if(!ep_set.empty()) {
+        sl_endpoints_received_(le_value_->text());
+    }
+}
+
+void OPCAddHostDialog::sl_endpoints_received_(const QString& host)
+{
+    if(!driver_manager_) return;
+    DriverInterface* driver = get_current_driver_();
+    if(!driver) return;
+
+    auto ep_set = driver->GetEndpointNames(host);
+    if(ep_set.empty()) return;
+
+    ep_combobox_->clear();
+    for(auto& it: ep_set) {
+        ep_combobox_->addItem(it);
+    }
+    ep_combobox_->setEnabled(true);
+    ok_btn_->setEnabled(true);
+}
+
+DriverInterface* OPCAddHostDialog::get_current_driver_()
+{
+    switch(data_type_cb_->currentIndex()) {
+    case 0: return driver_manager_->GetDriverPtr(DataTag::DataSource::OPCDA);
+    case 1: return driver_manager_->GetDriverPtr(DataTag::DataSource::OPCUA);
+    default: return nullptr;
+    }
+}
+
+void OPCAddHostDialog::sl_data_type_changed(int index)
+{
+    if(data_type_cb_->currentText() == u"OPC UA"_s) {
+        QString host_raw = le_value_->text();
+        if (!host_raw.startsWith("opc.tcp://")) {
+            host_raw = "opc.tcp://" + host_raw;
+        }
+        if (host_raw.count(':') == 1) {
+            host_raw += ":4840";
+        }
+        le_value_->setText(host_raw);
+    }
+
+    if(data_type_cb_->currentText() == u"OPC DA"_s) {
+        QString host_raw = le_value_->text();
+        if (host_raw.startsWith("opc.tcp://")) {
+            host_raw = host_raw.last(host_raw.size() - 10);
+        }
+        le_value_->setText(host_raw);
+    }
+
+}
+
 
 //===============================================================
 //================ OPCTagsViewerModel ===========================
 //===============================================================
 
-OPCTagsViewerModel::OPCTagsViewerModel(const std::vector<QString>& tags, const QString& tag_prefix, OPC_HELPER::OPCDataManager& opc_manager, QObject *parent)
+OPCTagsViewerModel::OPCTagsViewerModel(DataBrowseItem* parent_data_item, const QString& tag_prefix, SourceDriverManager* driver_manager, QObject *parent)
     : QAbstractTableModel(parent)
-    , opc_manager_(opc_manager)
-    , tags_(tags)
+    , driver_manager_(driver_manager)
     , tag_prefix_(tag_prefix)
 {
-
+    source_ = parent_data_item ? parent_data_item->GetSource() : DataTag::DataSource::NONVALID;
+    get_tags_from_data_item_recursievely_(parent_data_item);
 }
 
 int OPCTagsViewerModel::rowCount(const QModelIndex &parent) const
 {
-    return tags_.size();
+    return tags_browse_names_.size();
 }
 
 int OPCTagsViewerModel::columnCount(const QModelIndex &parent) const
@@ -443,16 +486,15 @@ QVariant OPCTagsViewerModel::data(const QModelIndex &index, int role) const
     if(!index.isValid()) return {};
 
     if(role == Qt::DisplayRole && index.column() == 0) {
-        if(std::cmp_less(index.row(), tags_.size())) {
-            return tags_.at(index.row());
+        if(std::cmp_less(index.row(), tags_browse_names_.size())) {
+            return tags_browse_names_.at(index.row());
         } else {
             return {};
         }
     }
 
     if(role == Qt::DisplayRole && index.column() == 1) {
-        auto tag_status = opc_manager_.CheckTagReadState(QString("%1#%2").arg(tag_prefix_, tags_.at(index.row())));
-        return tag_status == OPC_HELPER::TAG_STATUS::PERIODIC_READ || tag_status == OPC_HELPER::TAG_STATUS::READ_BOTH;
+        return driver_manager_->TagRegistry()->CheckTagExist(tags_browse_name_to_full_tag_name_.at(&tags_browse_names_.at(index.row()))) > 0;
     }
 
     if(role == Qt::BackgroundRole) {
@@ -472,13 +514,14 @@ bool OPCTagsViewerModel::setData(const QModelIndex& index, const QVariant& value
 {
     if (!index.isValid()) return false;
 
-    if(index.column() == 1 && std::cmp_less(index.row(), tags_.size()))
+    if(index.column() == 1 && std::cmp_less(index.row(), tags_browse_names_.size()))
     {
-        QString full_tag_name = QString("%1#%2").arg(tag_prefix_, tags_.at(index.row()));
+        QString tag_id = tags_browse_name_to_id_.at(&tags_browse_names_.at(index.row()));
+        QString full_tag_name = QString("%1[%2]").arg(tag_prefix_, tag_id);
         if(value.toBool()) {
-            opc_manager_.AddTagToPeriodicReadList(full_tag_name);
+            driver_manager_->TagRegistry()->AddDataTag(source_, full_tag_name);
         } else {
-            opc_manager_.DeleteTagFromPeriodicRead(full_tag_name);
+            driver_manager_->DeleteTag(driver_manager_->TagRegistry()->CheckTagExist(full_tag_name));
         }
         return true;
     }
@@ -487,7 +530,7 @@ bool OPCTagsViewerModel::setData(const QModelIndex& index, const QVariant& value
 
 QModelIndex OPCTagsViewerModel::index(int row, int column, const QModelIndex &parent) const
 {
-    if(row >=0 && std::cmp_less(row, tags_.size()) && column >=0 && column < 2) {
+    if(row >=0 && std::cmp_less(row, tags_browse_names_.size()) && column >=0 && column < 2) {
         return createIndex(row, column);
     }
     return QModelIndex();
@@ -516,6 +559,46 @@ void OPCTagsViewerModel::reset()
 {
     QAbstractTableModel::beginResetModel();
     QAbstractTableModel::endResetModel();
+}
+
+void OPCTagsViewerModel::SetAllTagsToRead()
+{
+    for(const auto& it: tags_browse_names_) {
+        QString tag_id = tags_browse_name_to_id_.at(&it);
+        QString full_tag_name = QString("%1[%2]").arg(tag_prefix_, tag_id);
+
+        if(driver_manager_->TagRegistry()->CheckTagExist(QString("%1[%2]").arg(tag_prefix_, tag_id)) == 0) {
+            driver_manager_->TagRegistry()->AddDataTag(source_, full_tag_name);
+        }
+    }
+    reset();
+}
+
+void OPCTagsViewerModel::DeleteAllTags()
+{
+    for(const auto& it: tags_browse_names_) {
+        QString tag_id = tags_browse_name_to_id_.at(&it);
+        QString full_tag_name = QString("%1[%2]").arg(tag_prefix_, tag_id);
+        size_t id = driver_manager_->TagRegistry()->CheckTagExist(full_tag_name);
+        if(id > 0) {
+            driver_manager_->DeleteTag(id);
+        }
+    }
+    reset();
+}
+
+void OPCTagsViewerModel::get_tags_from_data_item_recursievely_(DataBrowseItem *item)
+{
+    if(!item) return;
+    for(size_t i = 0; std::cmp_less(i , item->ChildCount()); ++i) {
+        DataBrowseItem* child = item->Child(i);
+        if(child->GetType() == DataBrowseItem::ItemType::VARIABLE) {
+            tags_browse_names_.push_back(child->GetBrowseName());
+            tags_browse_name_to_id_[&tags_browse_names_.back()] = child->GetId();
+            tags_browse_name_to_full_tag_name_[&tags_browse_names_.back()] = QString("%1[%2]").arg(tag_prefix_, tags_browse_name_to_id_.at(&tags_browse_names_.back()));
+        }
+        get_tags_from_data_item_recursievely_(child);
+    }
 }
 
 
@@ -550,3 +633,199 @@ bool SelectReadModeCheckBox::editorEvent(QEvent *event, QAbstractItemModel *mode
     }
     return false;
 }
+
+//======================================================================
+//======= OpcBrowserTreeModel ==========================================
+//======================================================================
+
+DataBrowserTreeModel::DataBrowserTreeModel(QObject *parent)
+    : QAbstractItemModel(parent)
+    , root_item_(std::unique_ptr<DataBrowseItem>(new DataBrowseItem(DataBrowseItem::ItemType::ROOT, DataTag::DataSource::NONVALID, u"root"_s, u"root"_s, nullptr)))
+{}
+
+DataBrowserTreeModel::DataBrowserTreeModel(std::unique_ptr<DataBrowseItem>&& root_node, QObject *parent)
+    : QAbstractItemModel(parent)
+    , root_item_(std::move(root_node))
+{}
+
+
+QVariant DataBrowserTreeModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    return {};
+}
+
+QModelIndex DataBrowserTreeModel::index(int row, int column, const QModelIndex &parent) const
+{
+    if (!hasIndex(row, column, parent)) return {};
+
+    DataBrowseItem *parentItem = parent.isValid()
+                                     ? static_cast<DataBrowseItem*>(parent.internalPointer())
+                                     : root_item_.get();
+
+    if (auto *childItem = parentItem->Child(row))
+        return createIndex(row, column, childItem);
+    return {};
+}
+
+QModelIndex DataBrowserTreeModel::parent(const QModelIndex &index) const
+{
+    if (!index.isValid()) return {};
+
+    auto *childItem = static_cast<DataBrowseItem*>(index.internalPointer());
+    DataBrowseItem *parentItem = childItem->ParentItem();
+
+    return parentItem != root_item_.get()
+               ? createIndex(parentItem->Row(), 0, parentItem) : QModelIndex{};
+}
+
+int DataBrowserTreeModel::rowCount(const QModelIndex &parent) const
+{
+    if (parent.column() > 0) return 0;
+
+    const DataBrowseItem *parentItem = parent.isValid()
+                                           ? static_cast<const DataBrowseItem*>(parent.internalPointer())
+                                           : root_item_.get();
+    return parentItem->ChildCount();
+}
+
+int DataBrowserTreeModel::columnCount(const QModelIndex &parent) const
+{
+    return 3;
+}
+
+QVariant DataBrowserTreeModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid()) return {};
+
+    const auto *item = static_cast<const DataBrowseItem*>(index.internalPointer());
+    QFont font;
+
+    switch(role) {
+    case Qt::DisplayRole:
+        return item->Data(index.column());
+
+    case Qt::FontRole:
+        if(!index.parent().isValid())
+            font.setBold(true);
+        if(item->GetType() == DataBrowseItem::ItemType::ENDPOINT) {
+            font.setItalic(!item->IsBrowsed());
+        }
+        return font;
+
+    case Qt::TextAlignmentRole:
+        return index.column() == 0 ? Qt::AlignLeft : Qt::AlignHCenter;
+
+    case Qt::ToolTipRole:
+        if(index.column() == 0) {
+            return item->Data(0);
+        }
+    }
+    return {};
+}
+
+bool DataBrowserTreeModel::AddEndpoint(const QString &hostname, const QString &endpoint, DataTag::DataSource source)
+{
+    DataBrowseItem* host_ptr = root_item_->ChildByName(hostname);
+    if(!host_ptr || host_ptr->ChildByName(endpoint)) return false;
+
+    int rows_cnt = host_ptr->ChildCount();
+    QModelIndex parent_index = index(host_ptr->Row(), 0, QModelIndex());
+    DataBrowseItem* ep_item = new DataBrowseItem(DataBrowseItem::ItemType::ENDPOINT, source, endpoint, endpoint, host_ptr);
+
+    beginInsertRows(parent_index, rows_cnt, rows_cnt);
+    host_ptr->AppendChild(std::unique_ptr<DataBrowseItem>(ep_item));
+    endInsertRows();
+
+    return true;
+}
+
+bool DataBrowserTreeModel::DeleteEndpoint(const QString &hostname, const QString &endpoint)
+{
+    auto host_ptr = root_item_->ChildByName(hostname);
+    auto ep_ptr = host_ptr->ChildByName(endpoint);
+
+    if(!host_ptr || !ep_ptr) return false;
+
+    int row_index = ep_ptr->Row();
+    QModelIndex parent_index = index(host_ptr->Row(), 0, QModelIndex());
+
+    beginRemoveRows(parent_index, row_index, row_index);
+    host_ptr->DeleteChild(endpoint);
+    endRemoveRows();
+    return true;
+}
+
+DataBrowseItem *DataBrowserTreeModel::GetEndpoint(const QString &hostname, const QString &endpoint) const
+{
+    DataBrowseItem* host_ptr = root_item_->ChildByName(hostname);
+    if(!host_ptr) return nullptr;
+    return host_ptr->Child(endpoint);
+}
+
+DataBrowseItem *DataBrowserTreeModel::GetHost(const QString &hostname) const
+{
+    return root_item_->ChildByName(hostname);
+}
+
+bool DataBrowserTreeModel::AddHost(const QString &hostname)
+{
+    if(root_item_->ChildByName(hostname)) return false;
+
+    int row_index = root_item_->ChildCount();
+
+    beginInsertRows(QModelIndex(), row_index, row_index);
+    DataBrowseItem* host_item = new DataBrowseItem(DataBrowseItem::ItemType::HOST, DataTag::DataSource::NONVALID, hostname, hostname, root_item_.get());
+    root_item_->AppendChild(std::unique_ptr<DataBrowseItem>(host_item));
+    endInsertRows();
+
+    return true;
+}
+
+bool DataBrowserTreeModel::AbsorbChildNodes(const QString &hostname, const QString &endpoint, DataBrowseItem *item)
+{
+    if(!item) return false;
+    DataBrowseItem* host_ptr = root_item_->ChildByName(hostname);
+    if(!host_ptr) return false;
+    DataBrowseItem* ep_ptr = host_ptr->Child(endpoint);
+    if(!ep_ptr) return false;
+    beginResetModel();
+    ep_ptr->AbsorbChilds(item);
+    endResetModel();
+    return true;
+}
+
+void DataBrowserTreeModel::sl_data_changed(const QString &hostname, const QString &server_name)
+{
+    auto ep_ptr = root_item_->FindChildItemRecursievly(server_name);
+
+    if(!ep_ptr
+        || !ep_ptr->ParentItem()
+        || ep_ptr->ParentItem()->GetType() != DataBrowseItem::ItemType::ENDPOINT)
+        return;
+
+    int row_index = ep_ptr->Row();
+    QModelIndex ep_index_start = createIndex(row_index, 0, ep_ptr);
+    QModelIndex ep_index_stop = createIndex(row_index, columnCount() - 1, ep_ptr);
+
+    emit dataChanged(ep_index_start, ep_index_stop);
+}
+
+bool DataBrowserTreeModel::DeleteHost(const QString &hostname)
+{
+    auto host_ptr = root_item_->ChildByName(hostname);
+
+    if(!host_ptr || host_ptr->GetType() != DataBrowseItem::ItemType::HOST) return false;
+
+    int row_index = host_ptr->Row();
+
+    beginRemoveRows(QModelIndex(), row_index, row_index);
+    root_item_->DeleteChild(hostname);
+    endRemoveRows();
+    return true;
+}
+
+//======================================================================
+//======= DataBrowserFilterProxyModel ==================================
+//======================================================================
+
+

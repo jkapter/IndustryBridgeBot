@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(OPCDATgBot VERSION 1.0 LANGUAGES CXX)
+project(OPCDATgBot VERSION 1.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,12 +11,13 @@ add_definitions(-D_WIN32_WINNT=0x0A00)
 add_definitions(-DWIN32_LEAN_AND_MEAN)
 add_definitions(-DNOMINMAX)
 add_definitions(-DBOOST_ASIO_ENABLE_OLD_SERVICES)
+add_definitions(-DHAVE_CURL)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets OpcUa)
 
 set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party")
 set(OPC_INCLUDE_DIR   "${CMAKE_CURRENT_SOURCE_DIR}/../OPC_Foundation/Include")
@@ -43,8 +44,6 @@ find_package(Boost REQUIRED)
 
 find_package(Threads REQUIRED)
 
-add_definitions(-DHAVE_CURL)
-
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${OPC_INCLUDE_DIR}
@@ -56,19 +55,57 @@ include_directories(
 
 set(app_icon_resource_windows "../img/opcdabot.rc")
 
-qt_add_executable(OPCDATgBot
-    main.cpp
-    mainwindow.cpp
-    mainwindow.h
-    mainwindow.ui
-    opctag.h opctag.cpp
+set(OPCDATGBOT_CORE_SOURCES
     logger.h logger.cpp
-    opcdatamanager.h opcdatamanager.cpp
-    opcclientworker.h opcclientworker.cpp
-    copcclient.h copcclient.cpp
-    tgobject.h tgobject.cpp
-    tgbotmanager.h tgbotmanager.cpp
-    tgbotthreadwrapper.h tgbotthreadwrapper.cpp
+    datatag.h datatag.cpp
+    datatag_opcua.h datatag_opcua.cpp
+    datatagregistry.h datatagregistry.cpp
+    sourcedrivers/sourcedrivers.h sourcedrivers/sourcedrivers.cpp
+    sourcedrivers/sourcedrivermanager.h sourcedrivers/sourcedrivermanager.cpp
+    sourcedrivers/copcuaclient.h sourcedrivers/copcuaclient.cpp
+    tgobjects/tgobject.h tgobjects/tgobject.cpp
+    tgobjects/tgbotmanager.h tgobjects/tgbotmanager.cpp
+    tgobjects/tgbotthreadwrapper.h tgobjects/tgbotthreadwrapper.cpp
+)
+
+if(WIN32)
+    list(APPEND OPCDATGBOT_CORE_SOURCES
+        datatag_opcda.h datatag_opcda.cpp
+        sourcedrivers/copcclient.h sourcedrivers/copcclient.cpp
+        sourcedrivers/opcclientworker.h sourcedrivers/opcclientworker.cpp
+        sourcedrivers/opcda_driver.cpp
+    )
+endif()
+
+add_library(OPCDATgBotCore STATIC ${OPCDATGBOT_CORE_SOURCES})
+
+target_link_libraries(OPCDATgBotCore PUBLIC
+    Qt6::Core
+    Qt6::OpcUa
+    TgBot::TgBot
+)
+
+if(WIN32)
+    target_link_libraries(OPCDATgBotCore PUBLIC
+
+        ws2_32
+        wldap32
+        crypt32
+        normaliz
+        ole32
+        oleaut32
+        uuid
+    )
+endif()
+
+set(PROJECT_SOURCES
+        main.cpp
+        mainwindow.cpp
+        mainwindow.h
+        mainwindow.ui
+)
+
+qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
     res.qrc
     ${app_icon_resource_windows}
     ../styles/styles.qss
@@ -87,17 +124,15 @@ qt_add_executable(OPCDATgBot
 )
 
 target_link_libraries(OPCDATgBot PRIVATE
-    TgBot::TgBot
+    OPCDATgBotCore
     Qt6::Widgets
+    Qt6::OpcUa
+    TgBot::TgBot
     ${CURL_LIBRARIES}
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB
     ${CMAKE_THREAD_LIBS_INIT}
-    ws2_32
-    wldap32
-    crypt32
-    normaliz
 )
 
 set_target_properties(OPCDATgBot PROPERTIES

@@ -5,12 +5,14 @@
 
 enum class SITW_TYPE {
     Messages,
-    InlineButtons
+    InlineButtons,
+    WaitAnswerTag
 };
 
 class TgBotManager;
 class TGTrigger;
 class TGMessage;
+class TGMessageWaitAnswer;
 
 class SelectItemsTableWidget : public QTableWidget
 {
@@ -22,6 +24,8 @@ public:
     void ReadMessageContent(const TGMessage* message);
     void ResetContent();
     void SetButtonsToMessage(TGMessage* message);
+    void ReadWaitAnswerTagContent(const TGMessageWaitAnswer* message);
+    void SetWaitAnswerTagToMessage(TGMessageWaitAnswer* message);
 
 signals:
 
@@ -38,6 +42,7 @@ private:
     void set_column_width_();
     void update_content_messages_();
     void update_content_buttons_();
+    void update_content_wait_answer_tag_();
 };
 
 #endif // SELECTITEMSTABLEWIGGET_H

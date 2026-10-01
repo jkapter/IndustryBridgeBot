@@ -77,3 +77,10 @@ CMakeLists.txt.user*
 build/
 OPC_Foundation/
 src/tgBot/.vscode/
+
+# runtime data / secrets
+bin/token.dat
+bin/log.txt
+
+# stale backup copies kept locally, not meant for version control
+src/trash/

@@ -5,7 +5,7 @@
 #include "tgcommandconfigurationwidget.h"
 #include "tginlinebuttonsconfigurationwidget.h"
 #include "tgeventsconfigurationwidget.h"
-#include "tgbotmanager.h"
+#include "tgobjects/tgbotmanager.h"
 
 TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -22,17 +22,18 @@ TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QW
     ui->tvTGMessages->setHeaderHidden(true);
     ui->tvTGMessages->setModel(messages_tree_);
     ui->tvTGMessages->setSelectionMode(QAbstractItemView::SingleSelection);
-    QObject::connect(ui->tvTGMessages->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), messages_tree_, SLOT(sl_tree_selection_changed(QModelIndex,QModelIndex)));
-    QObject::connect(messages_tree_, SIGNAL(sg_set_item_selected(QModelIndex,QItemSelectionModel::SelectionFlags)), ui->tvTGMessages->selectionModel(), SLOT(setCurrentIndex(QModelIndex,QItemSelectionModel::SelectionFlags)));
+    QObject::connect(ui->tvTGMessages->selectionModel(), &QItemSelectionModel::currentChanged, messages_tree_, &TGObjectTreeModel::sl_tree_selection_changed);
+    QObject::connect(messages_tree_, &TGObjectTreeModel::sg_set_item_selected, ui->tvTGMessages->selectionModel(), &QItemSelectionModel::setCurrentIndex);
 
     message_widget_ = new TGMessageConfigurationWidget(*bot_manager, this);
-    QObject::connect(messages_tree_, SIGNAL(sg_change_tree_item(std::string,std::string)), message_widget_, SLOT(sl_change_object_data(std::string,std::string)), Qt::QueuedConnection);
-    QObject::connect(message_widget_, SIGNAL(sg_tgobject_changed(std::string,std::string)), messages_tree_, SLOT(sl_tgobject_changed(std::string,std::string)), Qt::QueuedConnection);
+    QObject::connect(messages_tree_, &TGObjectTreeModel::sg_change_tree_item, message_widget_, &TGMessageConfigurationWidget::sl_change_object_data, Qt::QueuedConnection);
+    QObject::connect(message_widget_, &TGMessageConfigurationWidget::sg_tgobject_changed, messages_tree_, &TGObjectTreeModel::sl_tgobject_changed, Qt::QueuedConnection);
     ui->frMessageData->layout()->addWidget(message_widget_);
 
-    QObject::connect(ui->tbAddTGMessage, SIGNAL(clicked(bool)), this, SLOT(sl_add_new_message()));
-    QObject::connect(ui->tbSaveMessage, SIGNAL(clicked(bool)), this, SLOT(sl_save_message()));
-    QObject::connect(ui->tbDeleteMessage, SIGNAL(clicked(bool)), this, SLOT(sl_delete_message()));
+    QObject::connect(ui->tbAddTGMessage, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_message);
+    QObject::connect(ui->tbAddTGMessageWaitAnswer, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_message_wait_answer);
+    QObject::connect(ui->tbSaveMessage, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_save_message);
+    QObject::connect(ui->tbDeleteMessage, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_delete_message);
 
     //------ commands ---------------------------------------
 
@@ -40,18 +41,18 @@ TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QW
     ui->tvAllCommands->setHeaderHidden(true);
     ui->tvAllCommands->setModel(commands_tree_);
     ui->tvAllCommands->setSelectionMode(QAbstractItemView::SingleSelection);
-    QObject::connect(ui->tvAllCommands->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), commands_tree_, SLOT(sl_tree_selection_changed(QModelIndex,QModelIndex)));
-    QObject::connect(commands_tree_, SIGNAL(sg_set_item_selected(QModelIndex,QItemSelectionModel::SelectionFlags)), ui->tvAllCommands->selectionModel(), SLOT(setCurrentIndex(QModelIndex,QItemSelectionModel::SelectionFlags)));
+    QObject::connect(ui->tvAllCommands->selectionModel(), &QItemSelectionModel::currentChanged, commands_tree_, &TGObjectTreeModel::sl_tree_selection_changed);
+    QObject::connect(commands_tree_, &TGObjectTreeModel::sg_set_item_selected, ui->tvAllCommands->selectionModel(), &QItemSelectionModel::setCurrentIndex);
 
     command_widget_ = new TGCommandConfigurationWidget(*bot_manager, this);
-    QObject::connect(commands_tree_, SIGNAL(sg_change_tree_item(std::string,std::string)), command_widget_, SLOT(sl_change_object_data(std::string,std::string)), Qt::QueuedConnection);
-    QObject::connect(command_widget_, SIGNAL(sg_tgobject_changed(std::string,std::string)), commands_tree_, SLOT(sl_tgobject_changed(std::string,std::string)), Qt::QueuedConnection);
+    QObject::connect(commands_tree_, &TGObjectTreeModel::sg_change_tree_item, command_widget_, &TGCommandConfigurationWidget::sl_change_object_data, Qt::QueuedConnection);
+    QObject::connect(command_widget_, &TGCommandConfigurationWidget::sg_tgobject_changed, commands_tree_, &TGObjectTreeModel::sl_tgobject_changed, Qt::QueuedConnection);
     ui->frCommandData->layout()->addWidget(command_widget_);
 
-    QObject::connect(ui->tbAddTGCommand, SIGNAL(clicked(bool)), this, SLOT(sl_add_new_command()));
-    QObject::connect(ui->tbSaveCommands, SIGNAL(clicked(bool)), this, SLOT(sl_save_commands()));
-    QObject::connect(ui->tbDeleteCommand, SIGNAL(clicked(bool)), this, SLOT(sl_delete_command()));
-    QObject::connect(ui->tbAddTGCommandToMainMenu, SIGNAL(clicked(bool)), this, SLOT(sl_add_command_to_main_menu()));
+    QObject::connect(ui->tbAddTGCommand, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_command);
+    QObject::connect(ui->tbSaveCommands, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_save_commands);
+    QObject::connect(ui->tbDeleteCommand, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_delete_command);
+    QObject::connect(ui->tbAddTGCommandToMainMenu, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_command_to_main_menu);
 
     //------ inline buttons -----------------------------------
 
@@ -59,17 +60,17 @@ TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QW
     ui->tvAllInlineButtons->setHeaderHidden(true);
     ui->tvAllInlineButtons->setModel(buttons_tree_);
     ui->tvAllInlineButtons->setSelectionMode(QAbstractItemView::SingleSelection);
-    QObject::connect(ui->tvAllInlineButtons->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), buttons_tree_, SLOT(sl_tree_selection_changed(QModelIndex,QModelIndex)));
-    QObject::connect(buttons_tree_, SIGNAL(sg_set_item_selected(QModelIndex,QItemSelectionModel::SelectionFlags)), ui->tvAllInlineButtons->selectionModel(), SLOT(setCurrentIndex(QModelIndex,QItemSelectionModel::SelectionFlags)));
+    QObject::connect(ui->tvAllInlineButtons->selectionModel(), &QItemSelectionModel::currentChanged, buttons_tree_, &TGObjectTreeModel::sl_tree_selection_changed);
+    QObject::connect(buttons_tree_, &TGObjectTreeModel::sg_set_item_selected, ui->tvAllInlineButtons->selectionModel(), &QItemSelectionModel::setCurrentIndex);
 
     button_widget_ = new TGInlineButtonsConfigurationWidget(*bot_manager, this);
-    QObject::connect(buttons_tree_, SIGNAL(sg_change_tree_item(std::string,std::string)), button_widget_, SLOT(sl_change_object_data(std::string,std::string)), Qt::QueuedConnection);
-    QObject::connect(button_widget_, SIGNAL(sg_tgobject_changed(std::string,std::string)), buttons_tree_, SLOT(sl_tgobject_changed(std::string,std::string)), Qt::QueuedConnection);
+    QObject::connect(buttons_tree_, &TGObjectTreeModel::sg_change_tree_item, button_widget_, &TGInlineButtonsConfigurationWidget::sl_change_object_data, Qt::QueuedConnection);
+    QObject::connect(button_widget_, &TGInlineButtonsConfigurationWidget::sg_tgobject_changed, buttons_tree_, &TGObjectTreeModel::sl_tgobject_changed, Qt::QueuedConnection);
     ui->frInlineButtonData->layout()->addWidget(button_widget_);
 
-    QObject::connect(ui->tbAddTGInlineButton, SIGNAL(clicked(bool)), this, SLOT(sl_add_new_inline_button()));
-    QObject::connect(ui->tbSaveInlineButtons, SIGNAL(clicked(bool)), this, SLOT(sl_save_inline_buttons()));
-    QObject::connect(ui->tbDeleteInlineButton, SIGNAL(clicked(bool)), this, SLOT(sl_delete_inline_button()));
+    QObject::connect(ui->tbAddTGInlineButton, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_inline_button);
+    QObject::connect(ui->tbSaveInlineButtons, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_save_inline_buttons);
+    QObject::connect(ui->tbDeleteInlineButton, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_delete_inline_button);
 
     //------ events ----------------------------------------
 
@@ -77,18 +78,18 @@ TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QW
     ui->tvAllEvents->setHeaderHidden(true);
     ui->tvAllEvents->setModel(events_tree_);
     ui->tvAllEvents->setSelectionMode(QAbstractItemView::SingleSelection);
-    QObject::connect(ui->tvAllEvents->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), events_tree_, SLOT(sl_tree_selection_changed(QModelIndex,QModelIndex)));
-    QObject::connect(events_tree_, SIGNAL(sg_set_item_selected(QModelIndex,QItemSelectionModel::SelectionFlags)), ui->tvAllEvents->selectionModel(), SLOT(setCurrentIndex(QModelIndex,QItemSelectionModel::SelectionFlags)));
+    QObject::connect(ui->tvAllEvents->selectionModel(), &QItemSelectionModel::currentChanged, events_tree_, &TGObjectTreeModel::sl_tree_selection_changed);
+    QObject::connect(events_tree_, &TGObjectTreeModel::sg_set_item_selected, ui->tvAllEvents->selectionModel(), &QItemSelectionModel::setCurrentIndex);
 
     events_widget_ = new TGEventsConfigurationWidget(*bot_manager, this);
-    QObject::connect(events_tree_, SIGNAL(sg_change_tree_item(std::string,std::string)), events_widget_, SLOT(sl_change_object_data(std::string,std::string)), Qt::QueuedConnection);
-    QObject::connect(events_widget_, SIGNAL(sg_tgobject_changed(std::string,std::string)), events_tree_, SLOT(sl_tgobject_changed(std::string,std::string)), Qt::QueuedConnection);
+    QObject::connect(events_tree_, &TGObjectTreeModel::sg_change_tree_item, events_widget_, &TGEventsConfigurationWidget::sl_change_object_data, Qt::QueuedConnection);
+    QObject::connect(events_widget_, &TGEventsConfigurationWidget::sg_tgobject_changed, events_tree_, &TGObjectTreeModel::sl_tgobject_changed, Qt::QueuedConnection);
     ui->frEventsData->layout()->addWidget(events_widget_);
 
-    QObject::connect(ui->tbAddTGEvent, SIGNAL(clicked(bool)), this, SLOT(sl_add_new_event()));
-    QObject::connect(ui->tbAddScheduleEvent, SIGNAL(clicked(bool)), this, SLOT(sl_add_new_scheduled_event()));
-    QObject::connect(ui->tbSaveEvents, SIGNAL(clicked(bool)), this, SLOT(sl_save_events()));
-    QObject::connect(ui->tbDeleteEvent, SIGNAL(clicked(bool)), this, SLOT(sl_delete_event()));
+    QObject::connect(ui->tbAddTGEvent, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_event);
+    QObject::connect(ui->tbAddScheduleEvent, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_add_new_scheduled_event);
+    QObject::connect(ui->tbSaveEvents, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_save_events);
+    QObject::connect(ui->tbDeleteEvent, &QAbstractButton::clicked, this, &TgBotConfigurationWidget::sl_delete_event);
 
     ui->tabWidget->setCurrentIndex(0);
 }
@@ -96,6 +97,15 @@ TgBotConfigurationWidget::TgBotConfigurationWidget(TgBotManager* bot_manager, QW
 TgBotConfigurationWidget::~TgBotConfigurationWidget()
 {
     delete ui;
+}
+
+void TgBotConfigurationWidget::showEvent(QShowEvent *event)
+{
+    int wdt = ui->spltMessageConfig->width();
+    ui->spltMessageConfig->setSizes({2*wdt/5, 3*wdt/5});
+    ui->spltCommandsConfig->setSizes({2*wdt/5, 3*wdt/5});
+    ui->spltInlineButtons->setSizes({2*wdt/5, 3*wdt/5});
+    ui->spltEventsConfig->setSizes({2*wdt/5, 3*wdt/5});
 }
 
 void TgBotConfigurationWidget::sl_add_new_message()
@@ -109,6 +119,21 @@ void TgBotConfigurationWidget::sl_add_new_message()
     std::unique_ptr<TGMessage> new_message_ptr = std::unique_ptr<TGMessage>(new TGMessage(tg_bot_manager_->GetTGParent()));
     const std::string& new_id = new_message_ptr->GetId();
     tg_bot_manager_->AddTGMessage(std::move(new_message_ptr));
+
+    messages_tree_->sl_tgobject_changed(new_id, {});
+}
+
+void TgBotConfigurationWidget::sl_add_new_message_wait_answer()
+{
+    auto cur_index = ui->tvTGMessages->selectionModel()->currentIndex();
+    if(cur_index.isValid() && cur_index.parent().isValid()) {
+        auto item_id = static_cast<TGTreeItem*>(cur_index.internalPointer())->GetId();
+        message_widget_->sl_change_object_data(item_id, item_id);
+    }
+
+    std::unique_ptr<TGMessageWaitAnswer> new_message_ptr = std::unique_ptr<TGMessageWaitAnswer>(new TGMessageWaitAnswer(tg_bot_manager_->GetTGParent()));
+    const std::string& new_id = new_message_ptr->GetId();
+    tg_bot_manager_->AddTGMessageWaitAnswer(std::move(new_message_ptr));
 
     messages_tree_->sl_tgobject_changed(new_id, {});
 }
@@ -414,6 +439,7 @@ void TGObjectTreeModel::prepare_data_tree_messages_()
     headers_.push_back(std::string("Текстовые сообщения с тэгами"));
     headers_.push_back(std::string("Текстовые сообщения с кнопками"));
     headers_.push_back(std::string("Текстовые сообщения с тэгом и кнопками"));
+    headers_.push_back(std::string("Сообщения с ожиданием ответа"));
     for(const auto& it: headers_) {
         header_to_ids_[&(it)] = {};
     }
@@ -422,6 +448,9 @@ void TGObjectTreeModel::prepare_data_tree_messages_()
         if(!it->IsInWork()) {
             //несохраненные сообщения индекс = 0
             index_header = 0;
+        } else if(dynamic_cast<TGMessageWaitAnswer*>(it) != nullptr) {
+            //сообщения с ожиданием ответа (с тэгами или без -- одна категория) индекс = 5
+            index_header = 5;
         } else if(!it->HasTags() && !it->HasButtons()) {
             //сообщения индекс = 1
             index_header = 1;
@@ -530,6 +559,9 @@ void TGObjectTreeModel::add_new_item_message_(const std::string &id)
     if(!mes_ptr->IsInWork()) {
         //несохраненные сообщения индекс = 0
         parent_index = 0;
+    } else if(dynamic_cast<TGMessageWaitAnswer*>(mes_ptr) != nullptr) {
+        //сообщения с ожиданием ответа индекс = 5
+        parent_index = 5;
     } else if(!mes_ptr->HasTags() && !mes_ptr->HasButtons()) {
         //сообщения индекс = 1
         parent_index = 1;

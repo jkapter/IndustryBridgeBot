@@ -1,24 +1,24 @@
 #include "opctagpostprocessingwidget.h"
 #include "ui_opctagpostprocessingwidget.h"
 
-#include "opctag.h"
+#include "datatag.h"
 
-OPCTagPostProcessingWidget::OPCTagPostProcessingWidget(std::shared_ptr<OPC_HELPER::OPCTag> tag, QWidget *parent)
+OPCTagPostProcessingWidget::OPCTagPostProcessingWidget(std::shared_ptr<DataTag> tag, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::OPCTagPostProcessingWidget)
     , tag_(tag)
 {
     ui->setupUi(this);
 
-    QObject::connect(ui->pbCancel, SIGNAL(clicked()), this, SLOT(close()));
-    QObject::connect(ui->pbOK, SIGNAL(clicked(bool)), this, SLOT(sl_pb_ok_clicked()));
+    QObject::connect(ui->pbCancel, &QAbstractButton::clicked, this, &QWidget::close);
+    QObject::connect(ui->pbOK, &QAbstractButton::clicked, this, &OPCTagPostProcessingWidget::sl_pb_ok_clicked);
 
     auto tag_gain = tag_->GetGainOption();
     if(tag_gain.has_value()) {
         ui->dsbGainValue->setValue(tag_gain.value());
     }
 
-    const std::unordered_map<QString, QString> substitute_table = tag_->GetEnumStringValues();
+    const std::unordered_map<QString, QString> substitute_table = tag_->GetSubstituteStringValues();
     ui->twSubstituteValue->setRowCount(substitute_table.size() > 0 ? substitute_table.size() : 1);
     ui->twSubstituteValue->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     for(int i = 0; i < ui->twSubstituteValue->rowCount(); ++i) {
@@ -38,7 +38,7 @@ OPCTagPostProcessingWidget::OPCTagPostProcessingWidget(std::shared_ptr<OPC_HELPE
         ++i;
     }
 
-    QObject::connect(ui->twSubstituteValue, SIGNAL(cellClicked(int,int)), this, SLOT(sl_table_cell_changed(int,int)));
+    QObject::connect(ui->twSubstituteValue, &QTableWidget::cellClicked, this, &OPCTagPostProcessingWidget::sl_table_cell_changed);
 }
 
 OPCTagPostProcessingWidget::~OPCTagPostProcessingWidget()
@@ -71,12 +71,12 @@ void OPCTagPostProcessingWidget::sl_pb_ok_clicked()
         tag_->SetGainOption(ui->dsbGainValue->value());
     }
 
-    tag_->ClearEnumStringValues();
+    tag_->ClearSubstituteStringValues();
     for(int i = 0; i < ui->twSubstituteValue->rowCount(); ++i) {
         QString val = ui->twSubstituteValue->item(i, 0)->text();
         QString subst_val = ui->twSubstituteValue->item(i, 1)->text();
         if((val.size() > 0) && (subst_val.size() > 0)) {
-            tag_->AddEnumStringValues(val, subst_val);
+            tag_->AddSubstituteStringValue(val, subst_val);
         }
     }
     close();

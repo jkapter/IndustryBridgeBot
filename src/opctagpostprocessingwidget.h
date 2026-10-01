@@ -7,16 +7,14 @@ namespace Ui {
 class OPCTagPostProcessingWidget;
 }
 
-namespace OPC_HELPER {
-class OPCTag;
-}
+class DataTag;
 
 class OPCTagPostProcessingWidget : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit OPCTagPostProcessingWidget(std::shared_ptr<OPC_HELPER::OPCTag> tag, QWidget *parent = nullptr);
+    explicit OPCTagPostProcessingWidget(std::shared_ptr<DataTag> tag, QWidget *parent = nullptr);
     virtual ~OPCTagPostProcessingWidget();
 
 protected:
@@ -29,7 +27,7 @@ private slots:
 
 private:
     Ui::OPCTagPostProcessingWidget *ui;
-    std::shared_ptr<OPC_HELPER::OPCTag> tag_;
+    std::shared_ptr<DataTag> tag_;
 
     void set_table_column_width_();
 };

@@ -8,15 +8,13 @@
 #include <QThread>
 #include <Qdir>
 #include <QFile>
-#include <QtCore>
 #include <QString>
 #include <QtEnvironmentVariables>
 
 #include "logger.h"
-#include "tgbotmanager.h"
-#include "opcdatamanager.h"
-
-//#include "opctag.h"
+#include "tgobjects/tgbotmanager.h"
+#include "sourcedrivers/sourcedrivermanager.h"
+#include "datatagregistry.h"
 
 bool check_argv(const char* argv, const char* par, std::string_view& value) {
     std::string_view par_str(par);
@@ -30,7 +28,6 @@ bool check_argv(const char* argv, const char* par, std::string_view& value) {
 
 int main(int argc, char *argv[])
 {
-
     int exit_code = 0;
     Logger log(QDir::currentPath(), QString("log.txt"));
     Logger::SetMaxSize(200000);
@@ -69,8 +66,10 @@ int main(int argc, char *argv[])
     }
 
     do {
-        std::unique_ptr<OPC_HELPER::OPCDataManager> opc_manager_ptr(new OPC_HELPER::OPCDataManager());
-        std::unique_ptr<TgBotManager> tg_bot_manager_ptr(new TgBotManager(*opc_manager_ptr.get()));
+        std::unique_ptr<DataTagRegistry> tag_registry = std::make_unique<DataTagRegistry>("opctags.json");
+        tag_registry->RestoreDataFromFile();
+        std::unique_ptr<SourceDriverManager> driver_manager = std::make_unique<SourceDriverManager>(tag_registry.get());
+        std::unique_ptr<TgBotManager> tg_bot_manager_ptr = std::make_unique<TgBotManager>(*driver_manager.get());
         bool start_app_minimized = false;
 
         {
@@ -78,16 +77,20 @@ int main(int argc, char *argv[])
         if(input_file.open(QIODeviceBase::ReadOnly)) {
             QJsonParseError json_error;
             QJsonDocument input_doc = QJsonDocument::fromJson(input_file.readAll(), &json_error);
-            if(json_error.error == QJsonParseError::NoError
-                && input_doc.object().contains("start_application_on_tray") && input_doc.object().value("start_application_on_tray").isBool()) {
+            if(json_error.error == QJsonParseError::NoError) {
+                if(input_doc.object().contains("start_application_on_tray") && input_doc.object().value("start_application_on_tray").isBool()) {
+                    start_app_minimized = input_doc.object().value("start_application_on_tray").toBool();
+                }
 
-                start_app_minimized = input_doc.object().value("start_application_on_tray").toBool();
+                if(input_doc.object().contains("log_level") && input_doc.object().value("log_level").isString()) {
+                    Logger::SetMinLevel(Logger::MinLevelFromString(input_doc.object().value("log_level").toString()));
+                }
             }
         }
         input_file.close();
         }
 
-        MainWindow w(tg_bot_manager_ptr.get(), opc_manager_ptr.get());
+        MainWindow w(tg_bot_manager_ptr.get(), driver_manager.get());
 
         if(!start_app_minimized) {
             w.show();

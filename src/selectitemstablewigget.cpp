@@ -4,10 +4,8 @@
 #include <QScrollBar>
 #include <QHeaderView>
 
-#include "tgobject.h"
-#include "tgbotmanager.h"
-#include "opcdatamanager.h"
-#include "opctag.h"
+#include "tgobjects/tgobject.h"
+#include "tgobjects/tgbotmanager.h"
 
 SelectItemsTableWidget::SelectItemsTableWidget(TgBotManager &bot_manager, SITW_TYPE type, int rows_num, QWidget *parent)
     : QTableWidget(parent)
@@ -26,11 +24,11 @@ SelectItemsTableWidget::SelectItemsTableWidget(TgBotManager &bot_manager, SITW_T
         for(int i = 0; i < this->rowCount(); ++i) {
             QComboBox* cb_command = new QComboBox(this);
             cb_command->addItems({" - ", "Отправить сообщение", "Записать тэг"});
-            QObject::connect(cb_command, SIGNAL(currentIndexChanged(int)), this, SLOT(sl_table_item_changed(int)));
+            QObject::connect(cb_command, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
             setCellWidget(i, 0, cb_command);
             QComboBox* cb_messages = new QComboBox(this);
             cb_messages->setEnabled(false);
-            QObject::connect(cb_messages, SIGNAL(currentIndexChanged(int)), this, SLOT(sl_table_item_changed(int)));
+            QObject::connect(cb_messages, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
             setCellWidget(i, 1, cb_messages);
 
             QTableWidgetItem* text_item = new QTableWidgetItem("");
@@ -42,11 +40,27 @@ SelectItemsTableWidget::SelectItemsTableWidget(TgBotManager &bot_manager, SITW_T
         for(int i = 0; i < this->rowCount(); ++i) {
             QComboBox* cb_command = new QComboBox(this);
             cb_command->addItems({" - ", "Встроенная кнопка"});
-            QObject::connect(cb_command, SIGNAL(currentIndexChanged(int)), this, SLOT(sl_table_item_changed(int)));
+            QObject::connect(cb_command, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
             setCellWidget(i, 0, cb_command);
             QComboBox* cb_messages = new QComboBox(this);
             cb_messages->setEnabled(false);
-            QObject::connect(cb_messages, SIGNAL(currentIndexChanged(int)), this, SLOT(sl_table_item_changed(int)));
+            QObject::connect(cb_messages, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
+            setCellWidget(i, 1, cb_messages);
+
+            QTableWidgetItem* text_item = new QTableWidgetItem("");
+            text_item->setFlags(Qt::NoItemFlags);
+            setItem(i, 2, text_item);
+        }
+        break;
+    case SITW_TYPE::WaitAnswerTag:
+        for(int i = 0; i < this->rowCount(); ++i) {
+            QComboBox* cb_command = new QComboBox(this);
+            cb_command->addItems({" - ", "Записать ответ в тэг"});
+            QObject::connect(cb_command, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
+            setCellWidget(i, 0, cb_command);
+            QComboBox* cb_messages = new QComboBox(this);
+            cb_messages->setEnabled(false);
+            QObject::connect(cb_messages, &QComboBox::currentIndexChanged, this, &SelectItemsTableWidget::sl_table_item_changed);
             setCellWidget(i, 1, cb_messages);
 
             QTableWidgetItem* text_item = new QTableWidgetItem("");
@@ -59,10 +73,10 @@ SelectItemsTableWidget::SelectItemsTableWidget(TgBotManager &bot_manager, SITW_T
 
 void SelectItemsTableWidget::sl_table_item_changed(int cb_index)
 {
-    if(content_type_ == SITW_TYPE::Messages) {
-        update_content_messages_();
-    } else {
-        update_content_buttons_();
+    switch(content_type_) {
+    case SITW_TYPE::Messages:      update_content_messages_(); break;
+    case SITW_TYPE::InlineButtons: update_content_buttons_(); break;
+    case SITW_TYPE::WaitAnswerTag: update_content_wait_answer_tag_(); break;
     }
 }
 
@@ -84,13 +98,13 @@ void SelectItemsTableWidget::ReadCommandContent(const TGTrigger* command)
         ++row_index;
     }
 
-    for(const auto & [tag, val]: command->GetOpcTagsWSetValues()) {
+    for(const auto & [id, val]: command->GetIdTagsWSetValues()) {
         QComboBox* cb_com = qobject_cast<QComboBox*>(cellWidget(row_index, 0));
         QComboBox* cb_mes = qobject_cast<QComboBox*>(cellWidget(row_index, 1));
-        if(!cb_com || !cb_mes || !bot_manager_.GetTGParent()->OPCManager()) return;
+        if(!cb_com || !cb_mes || !bot_manager_.GetTGParent()->TagManager()) return;
         cb_com->setCurrentIndex(2);
-        cb_mes->setCurrentText(QString("%1: %2").arg(bot_manager_.GetTGParent()->OPCManager()->GetTagId(tag->GetFullName())).arg(tag->GetTagName()));
-        item(row_index, 2)->setText(OPC_HELPER::toString(val));
+        cb_mes->setCurrentText(QString("%1: %2").arg(id).arg(bot_manager_.GetTGParent()->TagManager()->GetTagOfId(id)->GetTagName()));
+        item(row_index, 2)->setText(DATATAG::toString(val));
         item(row_index, 2)->setTextAlignment(Qt::AlignCenter);
         item(row_index, 2)->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled);
         ++row_index;
@@ -117,12 +131,8 @@ void SelectItemsTableWidget::SetMessagesToCommand(TGTrigger* command)
             bool b = false;
 
             size_t id_tag = id.left(id.indexOf(':')).toULongLong(&b);
-            std::shared_ptr<OPC_HELPER::OPCTag> tag_ptr = nullptr;
-            if(b && bot_manager_.GetTGParent()->OPCManager()) {
-                tag_ptr = bot_manager_.GetTGParent()->OPCManager()->GetOPCTag(id_tag);
-            }
-            if(tag_ptr) {
-                command->AddOPCTagWValue(tag_ptr, item(i, 2)->text());
+            if(b) {
+                command->AddDataTagWValue(id_tag, item(i, 2)->text());
             }
         }
     }
@@ -180,12 +190,51 @@ void SelectItemsTableWidget::SetButtonsToMessage(TGMessage *message)
     }
 }
 
+void SelectItemsTableWidget::ReadWaitAnswerTagContent(const TGMessageWaitAnswer *message)
+{
+    if(content_type_ != SITW_TYPE::WaitAnswerTag) return;
+    update_content_wait_answer_tag_();
+    ResetContent();
+    if(!message || !bot_manager_.GetTGParent()->TagManager()) return;
+
+    size_t tag_id = message->GetDataTagID();
+    auto tag_ptr = bot_manager_.GetTGParent()->TagManager()->GetTagOfId(tag_id);
+    if(!tag_ptr) return;
+
+    QComboBox* cb_com = qobject_cast<QComboBox*>(cellWidget(0, 0));
+    QComboBox* cb_tag = qobject_cast<QComboBox*>(cellWidget(0, 1));
+    if(!cb_com || !cb_tag) return;
+    cb_com->setCurrentIndex(1);
+    cb_tag->setCurrentText(QString("%1: %2").arg(tag_id).arg(tag_ptr->GetTagName()));
+}
+
+void SelectItemsTableWidget::SetWaitAnswerTagToMessage(TGMessageWaitAnswer *message)
+{
+    if(!message) return;
+    if(content_type_ != SITW_TYPE::WaitAnswerTag) return;
+
+    QComboBox* cb_com = qobject_cast<QComboBox*>(cellWidget(0, 0));
+    QComboBox* cb_tag = qobject_cast<QComboBox*>(cellWidget(0, 1));
+    if(!cb_com || !cb_tag) return;
+
+    if(cb_com->currentIndex() == 1) {
+        QString id_str = cb_tag->currentText();
+        bool b = false;
+        size_t tag_id = id_str.left(id_str.indexOf(':')).toULongLong(&b);
+        if(b) {
+            message->SetDataTag(tag_id);
+        }
+    } else {
+        message->SetDataTag(0);
+    }
+}
+
 void SelectItemsTableWidget::showEvent(QShowEvent *ev)
 {
-    if(content_type_ == SITW_TYPE::Messages) {
-        update_content_messages_();
-    } else {
-        update_content_buttons_();
+    switch(content_type_) {
+    case SITW_TYPE::Messages:      update_content_messages_(); break;
+    case SITW_TYPE::InlineButtons: update_content_buttons_(); break;
+    case SITW_TYPE::WaitAnswerTag: update_content_wait_answer_tag_(); break;
     }
     set_column_width_();
 }
@@ -262,14 +311,8 @@ void SelectItemsTableWidget::update_content_messages_()
             QStringList tag_list;
             QMap<size_t, QString> tags_id_to_names;
 
-            auto tags = bot_manager_.GetTGParent()->OPCManager()->GetPeriodicTags();
-
-            for(size_t j = 0; j < tags.size(); ++j) {
-                tags_id_to_names[bot_manager_.GetTGParent()->OPCManager()->GetTagId(tags.at(j)->GetFullName())] = tags.at(j)->GetTagName();
-            }
-
-            for(auto it = tags_id_to_names.begin(); it != tags_id_to_names.end(); ++it) {
-                tag_list.push_back(QString("%1: %2").arg(it.key()).arg(it.value()));
+            for(const auto& [id, tag_ptr]: bot_manager_.GetTGParent()->TagManager()->GetIdToTagsMap()) {
+                tag_list.push_back(QString("%1: %2").arg(id).arg(tag_ptr->GetTagName()));
             }
             tag_list.push_front(" - ");
 
@@ -319,6 +362,36 @@ void SelectItemsTableWidget::update_content_buttons_()
                 item(i, 2)->setText(QString::fromStdString(btn->GetButtonName()));
             }
             cb_mes->setEnabled(true);
+        }
+    }
+}
+
+void SelectItemsTableWidget::update_content_wait_answer_tag_()
+{
+    for(int i = 0; i < this->rowCount(); ++i) {
+        QComboBox* cb_com = qobject_cast<QComboBox*>(cellWidget(i, 0));
+        QComboBox* cb_tag = qobject_cast<QComboBox*>(cellWidget(i, 1));
+        const QSignalBlocker blocker_1(cb_tag);
+        const QSignalBlocker blocker_2(cb_com);
+        if(!cb_com || !cb_tag) return;
+
+        if(cb_com->currentIndex() == 0) {
+            cb_tag->setCurrentIndex(0);
+            cb_tag->setEnabled(false);
+            item(i, 2)->setText("");
+        } else {
+            QString tag_str = cb_tag->currentText();
+            cb_tag->clear();
+            QStringList tag_list;
+            tag_list.push_back(" - ");
+
+            for(const auto& [id, tag_ptr]: bot_manager_.GetTGParent()->TagManager()->GetIdToTagsMap()) {
+                tag_list.push_back(QString("%1: %2").arg(id).arg(tag_ptr->GetTagName()));
+            }
+
+            cb_tag->addItems(tag_list);
+            cb_tag->setCurrentText(tag_str);
+            cb_tag->setEnabled(true);
         }
     }
 }

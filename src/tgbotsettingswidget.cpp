@@ -5,7 +5,9 @@
 
 #include "hintinputdialog.h"
 #include "plaintextconsole.h"
-#include "tgbotmanager.h"
+#include "tgobjects/tgbotmanager.h"
+
+using namespace Qt::StringLiterals;
 
 TgBotSettingsWidget::TgBotSettingsWidget(TgBotManager* bot_manager, QWidget *parent)
     : QWidget(parent)
@@ -20,21 +22,22 @@ TgBotSettingsWidget::TgBotSettingsWidget(TgBotManager* bot_manager, QWidget *par
     ui->frConsoleOutput->setLayout(new QVBoxLayout());
     ui->frConsoleOutput->layout()->addWidget(console_);
 
-    QObject::connect(bot_manager_, SIGNAL(sg_bot_thread_state_changed()), this, SLOT(sl_bot_status_changed()));
-    QObject::connect(bot_manager_, SIGNAL(sg_send_message_to_console(QString)), this, SLOT(sl_console_output_message(QString)));
-    QObject::connect(ui->cbRestartAppOnError, SIGNAL(checkStateChanged(Qt::CheckState)), this, SIGNAL(sg_change_auto_restart_app_checkbox(Qt::CheckState)));
-    QObject::connect(ui->cbStartAppHiddenTray, SIGNAL(checkStateChanged(Qt::CheckState)), this, SIGNAL(sg_change_start_app_mode_checkbox(Qt::CheckState)));
-    QObject::connect(ui->pbStartBot, SIGNAL(clicked(bool)), this, SLOT(sl_pb_startbot_clicked()));
-    QObject::connect(ui->pbStopBot, SIGNAL(clicked(bool)), this, SLOT(sl_pb_stopbot_clicked()));
-    QObject::connect(ui->cbAutoRestartbot, SIGNAL(stateChanged(int)), this, SLOT(sl_cb_autorestartbot_statechanged(int)));
-    QObject::connect(ui->tbRefreshUsers, SIGNAL(clicked(bool)), this, SLOT(sl_tb_refreshusers_clicked()));
-    QObject::connect(ui->tbVerifyUser, SIGNAL(clicked(bool)), this, SLOT(sl_tb_verifyuser_clicked()));
-    QObject::connect(ui->tbSetAdmin, SIGNAL(clicked(bool)), this, SLOT(sl_tb_setadmin_clicked()));
-    QObject::connect(ui->tbResetAdmin, SIGNAL(clicked(bool)), this, SLOT(sl_tb_resetadmin_clicked()));
-    QObject::connect(ui->tbSendMessage, SIGNAL(clicked(bool)), this, SLOT(sl_tb_sendmessage_clicked()));
-    QObject::connect(ui->tbBanUser, SIGNAL(clicked(bool)), this, SLOT(sl_tb_banuser_clicked()));
-    QObject::connect(ui->tabBotSettings, SIGNAL(currentChanged(int)), this, SLOT(sl_tab_botsettings_current_changed(int)));
-    QObject::connect(ui->cbAddBotNameToChannelMessages, SIGNAL(checkStateChanged(Qt::CheckState)), this, SLOT(sl_cb_addbotnametochannelmessages_check_state_changed(Qt::CheckState)));
+    QObject::connect(bot_manager_, &TgBotManager::sg_bot_thread_state_changed, this, &TgBotSettingsWidget::sl_bot_status_changed);
+    QObject::connect(bot_manager_, &TgBotManager::sg_send_message_to_console, this, &TgBotSettingsWidget::sl_console_output_message);
+    QObject::connect(ui->cbRestartAppOnError, &QCheckBox::checkStateChanged, this, &TgBotSettingsWidget::sg_change_auto_restart_app_checkbox);
+    QObject::connect(ui->cbStartAppHiddenTray, &QCheckBox::checkStateChanged, this, &TgBotSettingsWidget::sg_change_start_app_mode_checkbox);
+    QObject::connect(ui->pbStartBot, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_pb_startbot_clicked);
+    QObject::connect(ui->pbStopBot, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_pb_stopbot_clicked);
+    QObject::connect(ui->cbAutoRestartbot, &QCheckBox::checkStateChanged, this, &TgBotSettingsWidget::sl_cb_autorestartbot_statechanged);
+    QObject::connect(ui->tbRefreshUsers, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_refreshusers_clicked);
+    QObject::connect(ui->tbVerifyUser, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_verifyuser_clicked);
+    QObject::connect(ui->tbSetAdmin, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_setadmin_clicked);
+    QObject::connect(ui->tbResetAdmin, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_resetadmin_clicked);
+    QObject::connect(ui->tbSendMessage, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_sendmessage_clicked);
+    QObject::connect(ui->tbSendToAll, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_sendtoall_clicked);
+    QObject::connect(ui->tbBanUser, &QAbstractButton::clicked, this, &TgBotSettingsWidget::sl_tb_banuser_clicked);
+    QObject::connect(ui->tabBotSettings, &QTabWidget::currentChanged, this, &TgBotSettingsWidget::sl_tab_botsettings_current_changed);
+    QObject::connect(ui->cbAddBotNameToChannelMessages, &QCheckBox::checkStateChanged, this, &TgBotSettingsWidget::sl_cb_addbotnametochannelmessages_check_state_changed);
 
     ui->tabBotSettings->setCurrentIndex(0);
     ui->cbAutoRestartbot->setChecked(bot_manager_->IsAutoRestart());
@@ -73,11 +76,11 @@ void TgBotSettingsWidget::showEvent(QShowEvent *event) {
 void TgBotSettingsWidget::sl_bot_status_changed() {
     if(!ui) return;
     if(bot_manager_->BotIsWorking()) {
-        ui->lbBotStatus->setText("Бот запущен");
-        ui->lbBotStatus->setStyleSheet(QString("color: white; background-color: darkgreen; border: 2px solid #519999; border-radius: 6px; padding: 5px;"));
+        ui->lbBotStatus->setText(u"Бот запущен"_s);
+        ui->lbBotStatus->setStyleSheet(u"color: white; background-color: darkgreen; border: 2px solid #519999; border-radius: 6px; padding: 5px;"_s);
     } else {
         ui->lbBotStatus->setText("Бот остановлен");
-        ui->lbBotStatus->setStyleSheet(QString("color: white; background-color: darkred; border: 2px solid #519999; border-radius: 6px; padding: 5px;"));
+        ui->lbBotStatus->setStyleSheet(u"color: white; background-color: darkred; border: 2px solid #519999; border-radius: 6px; padding: 5px;"_s);
     }
 }
 
@@ -159,7 +162,7 @@ void TgBotSettingsWidget::sl_tb_verifyuser_clicked()
 {
     auto sel_ranges = ui->tblUsers->selectedRanges();
     if(sel_ranges.isEmpty()) {
-        QMessageBox::information(this, "Информация", "Пользователь не выбран");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не выбран"_s);
         return;
     }
 
@@ -168,14 +171,14 @@ void TgBotSettingsWidget::sl_tb_verifyuser_clicked()
     id = ui->tblUsers->item(sel_ranges.at(0).topRow(), 0)->text().toLongLong(&b);
 
     if(!b) {
-        QMessageBox::information(this, "Информация", "ID пользователя неверный");
+        QMessageBox::information(this, u"Информация"_s, u"ID пользователя неверный"_s);
         return;
     }
 
     if(bot_manager_->RegisterUser(id)) {
         users_table_update_();
     } else {
-        QMessageBox::information(this, "Информация", "Пользователь не найден");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не найден"_s);
     }
 }
 
@@ -184,7 +187,7 @@ void TgBotSettingsWidget::sl_tb_setadmin_clicked()
 {
     auto sel_ranges = ui->tblUsers->selectedRanges();
     if(sel_ranges.isEmpty()) {
-        QMessageBox::information(this, "Информация", "Пользователь не выбран");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не выбран"_s);
         return;
     }
 
@@ -193,14 +196,14 @@ void TgBotSettingsWidget::sl_tb_setadmin_clicked()
     id = ui->tblUsers->item(sel_ranges.at(0).topRow(), 0)->text().toLongLong(&b);
 
     if(!b) {
-        QMessageBox::information(this, "Информация", "ID пользователя неверный");
+        QMessageBox::information(this, u"Информация"_s, u"ID пользователя неверный"_s);
         return;
     }
 
     if(bot_manager_->SetAdmin(id)) {
         users_table_update_();
     } else {
-        QMessageBox::information(this, "Информация", "Пользователь не найден");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не найден"_s);
     }
 }
 
@@ -209,7 +212,7 @@ void TgBotSettingsWidget::sl_tb_resetadmin_clicked()
 {
     auto sel_ranges = ui->tblUsers->selectedRanges();
     if(sel_ranges.isEmpty()) {
-        QMessageBox::information(this, "Информация", "Пользователь не выбран");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не выбран"_s);
         return;
     }
 
@@ -218,25 +221,25 @@ void TgBotSettingsWidget::sl_tb_resetadmin_clicked()
     id = ui->tblUsers->item(sel_ranges.at(0).topRow(), 0)->text().toLongLong(&b);
 
     if(!b) {
-        QMessageBox::information(this, "Информация", "ID пользователя неверный");
+        QMessageBox::information(this, u"Информация"_s, u"ID пользователя неверный"_s);
         return;
     }
 
     if(bot_manager_->ResetAdmin(id)) {
         users_table_update_();
     } else {
-        QMessageBox::information(this, "Информация", "Пользователь не найден");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не найден"_s);
     }
 }
 
 void TgBotSettingsWidget::show_message_input_dialog_() {
-    QString help_text = "*bold text*\n_italic text_\n__underline__\n~strikethrough~\n||spoiler||\n[inline URL](http://www.example.com/)\n[inline mention of a user](tg://user?id=123456789)\n![👍](tg://emoji?id=5368324170671202286)\n";
+    QString help_text{"*bold text*\n_italic text_\n__underline__\n~strikethrough~\n||spoiler||\n[inline URL](http://www.example.com/)\n[inline mention of a user](tg://user?id=123456789)\n![👍](tg://emoji?id=5368324170671202286)\n"};
     HintInputDialog* input_dialog = new HintInputDialog(help_text, this);
     input_dialog->setWindowFlag(Qt::MSWindowsFixedSizeDialogHint);
     input_dialog->setWindowModality(Qt::WindowModality::WindowModal);
     input_dialog->setWindowTitle(tr("Отправить сообщение пользователю"));
     input_dialog->setGeometry(this->pos().rx() + 200, this->pos().ry() + 100, 400, 500);
-    QObject::connect(input_dialog, SIGNAL(sg_applied(QString)), this, SLOT(sl_get_text_message_to_clients(QString)));
+    QObject::connect(input_dialog, &HintInputDialog::sg_applied, this, &TgBotSettingsWidget::sl_get_text_message_to_clients);
     input_dialog->show();
 }
 
@@ -244,7 +247,7 @@ void TgBotSettingsWidget::sl_tb_sendmessage_clicked()
 {
     auto sel_ranges = ui->tblUsers->selectedRanges();
     if(sel_ranges.isEmpty()) {
-        QMessageBox::information(this, "Информация", "Пользователь не выбран");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не выбран"_s);
         return;
     }
 
@@ -253,7 +256,7 @@ void TgBotSettingsWidget::sl_tb_sendmessage_clicked()
     id = ui->tblUsers->item(sel_ranges.at(0).topRow(), 0)->text().toLongLong(&b);
 
     if(!b) {
-        QMessageBox::information(this, "Информация", "ID пользователя неверный");
+        QMessageBox::information(this, u"Информация"_s, u"ID пользователя неверный"_s);
         return;
     }
 
@@ -284,7 +287,7 @@ void TgBotSettingsWidget::sl_tb_banuser_clicked()
 {
     auto sel_ranges = ui->tblUsers->selectedRanges();
     if(sel_ranges.isEmpty()) {
-        QMessageBox::information(this, "Информация", "Пользователь не выбран");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не выбран"_s);
         return;
     }
 
@@ -293,14 +296,14 @@ void TgBotSettingsWidget::sl_tb_banuser_clicked()
     id = ui->tblUsers->item(sel_ranges.at(0).topRow(), 0)->text().toLongLong(&b);
 
     if(!b) {
-        QMessageBox::information(this, "Информация", "ID пользователя неверный");
+        QMessageBox::information(this, u"Информация"_s, u"ID пользователя неверный"_s);
         return;
     }
 
     if(bot_manager_->BanUser(id)) {
         users_table_update_();
     } else {
-        QMessageBox::information(this, "Информация", "Пользователь не найден");
+        QMessageBox::information(this, u"Информация"_s, u"Пользователь не найден"_s);
     }
 }
 

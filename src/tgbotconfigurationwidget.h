@@ -5,7 +5,7 @@
 #include <QAbstractItemModel>
 #include <QItemSelectionModel>
 
-#include "tgobject.h"
+#include "tgobjects/tgobject.h"
 
 Q_DECLARE_METATYPE(std::string)
 
@@ -29,9 +29,13 @@ public:
     explicit TgBotConfigurationWidget(TgBotManager* bot_manager, QWidget *parent = nullptr);
     virtual ~TgBotConfigurationWidget();
 
+protected:
+    void showEvent(QShowEvent *event) override;
+
 private slots:
 
     void sl_add_new_message();
+    void sl_add_new_message_wait_answer();
     void sl_delete_message();
     void sl_save_message();
 

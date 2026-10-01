@@ -40,5 +40,9 @@
         <file>../img/icons/add_sch_event.png</file>
         <file>../img/icons/question_mark_icon.png</file>
         <file>../img/icons/circle_green_checkmark.svg</file>
+        <file>../img/icons/add_data_source.png</file>
+        <file>../img/icons/delete_data_source.png</file>
+        <file>../img/icons/checkbox.png</file>
+        <file>../img/icons/add-callback-message.png</file>
     </qresource>
 </RCC>
