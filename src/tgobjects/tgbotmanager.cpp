@@ -199,18 +199,6 @@ TgBotManager::~TgBotManager() {
     qInfo() << QString("TgBotManager деструктор завершен");
 }
 
-void TgBotManager::screen_symbols_(std::string& text, const std::string& symbols) const
-{
-    for(auto it = text.begin(); it < text.end(); ++it) {
-        if(symbols.find(*it) != symbols.npos) {
-            if(it == text.begin() || *(it-1) != '\\') {
-                it = text.insert(it, '\\');
-                ++it;
-            }
-        }
-    }
-}
-
 void TgBotManager::AddOrUpdateUser(TgBot::Message::Ptr message) {
     if(!message || !message->chat) {
         qCritical() << u"Получено пустое сообщение (NULL) или отсутствует id чата"_s;
@@ -235,7 +223,7 @@ void TgBotManager::AddOrUpdateUser(TgBot::Message::Ptr message) {
         emit sg_send_message_to_console(QString::fromStdString(mes));
         qInfo() << QString::fromStdString(mes);
 
-        screen_symbols_(mes, screened_symbols_);
+        TGHELPER::tg_screen_symbols(mes);
         users_.emplace(message->chat->id, TgBotUser(message));
         users_.at(message->chat->id).type = USER_TYPE::UNREGISTERED;
         tg_parent_->AddOrUpdateChatID(message->chat->id, USER_TYPE::UNREGISTERED);
@@ -377,7 +365,7 @@ void TgBotManager::make_admin_tools_() {
                                                                        ,it->lastMessageDT.toString("dd.MM.yyyy hh:mm:ss")));
         }
         std::string std_mes = mes.toStdString();
-        screen_symbols_(std_mes, screened_symbols_);
+        TGHELPER::tg_screen_symbols(std_mes);
         tg_parent_->BotSendMessage(query->message->chat->id, std_mes);
     };
 
@@ -401,7 +389,7 @@ void TgBotManager::make_admin_tools_() {
                            .arg(DataTag::QualityToString(pair_tag_n.first->GetTagQuality())));
         }
         std::string std_mes = mes.toStdString();
-        screen_symbols_(std_mes, screened_symbols_);
+        TGHELPER::tg_screen_symbols(std_mes);
         tg_parent_->BotSendMessage(query->message->chat->id, std_mes);
     };
 
@@ -782,7 +770,7 @@ void TgBotManager::make_opc_communication_event_()
             }
 
             std::string std_mes = mes.toStdString();
-            screen_symbols_(std_mes, screened_symbols_);
+            TGHELPER::tg_screen_symbols(std_mes);
 
             for(const auto& it: GetUsers(USER_TYPE::ADMIN)) {
                 tg_parent_->BotSendMessage(it->chatId, std_mes);

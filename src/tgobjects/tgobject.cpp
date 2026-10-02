@@ -116,6 +116,7 @@ TgBot::Message::Ptr TGParent::BotSendMessage(int64_t chat_id, const std::string&
 {
     if(bot_ptr_) {
         std::string text_to_send(text);
+        TGHELPER::tg_screen_symbols(text_to_send);
         if(user_permission_to_chat_id_.count(USER_TYPE::CHANNEL) > 0
             && user_permission_to_chat_id_.at(USER_TYPE::CHANNEL).count(chat_id) > 0
             && bot_name_for_channel_.has_value()) {
@@ -230,7 +231,7 @@ TGMessage::TGMessage(const std::string& message, TGParent* parent)
     : TGObject(parent)
     , message_(message)
 {
-    screen_symbols_(message_, screened_symbols_);
+    TGHELPER::tg_screen_symbols(message_);
     parse_message_();
     get_tags_ptr_();
 }
@@ -239,21 +240,21 @@ TGMessage::TGMessage(std::string&& message, TGParent* parent)
     : TGObject(parent)
     , message_(std::move(message))
 {
-    screen_symbols_(message_, screened_symbols_);
+    TGHELPER::tg_screen_symbols(message_);
     parse_message_();
     get_tags_ptr_();
 }
 
 void TGMessage::SetText(const std::string& mes) {
     message_ = mes;
-    screen_symbols_(message_, screened_symbols_);
+    TGHELPER::tg_screen_symbols(message_);
     parse_message_();
     get_tags_ptr_();
 }
 
 void TGMessage::SetText(std::string&& mes) {
     message_ = std::move(mes);
-    screen_symbols_(message_, screened_symbols_);
+    TGHELPER::tg_screen_symbols(message_);
     parse_message_();
     get_tags_ptr_();
 }
@@ -288,7 +289,7 @@ const std::string TGMessage::GetTextToSend() const
             message += it;
         }
     }
-    screen_symbols_(message, screened_symbols_);
+    TGHELPER::tg_screen_symbols(message);
     return message;
 }
 
@@ -344,18 +345,6 @@ QJsonObject TGMessage::SaveToJson() const
     }
     ret_obj.insert("opc_tags", tags_ids);
     return ret_obj;
-}
-
-void TGMessage::screen_symbols_(std::string& text, const std::string& symbols) const
-{
-    for(auto it = text.begin(); it < text.end(); ++it) {
-        if(symbols.find(*it) != symbols.npos) {
-            if(it == text.begin() || *(it-1) != '\\') {
-                it = text.insert(it, '\\');
-                ++it;
-            }
-        }
-    }
 }
 
 void TGMessage::parse_message_() {

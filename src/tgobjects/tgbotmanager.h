@@ -145,8 +145,6 @@ private:
     const int CHECK_EVENTS_PERIOD_ = 2000;
     const int RESTART_BOT_PERIOD_ = 10000;
     const int TIME_TO_RESTART_APP_ON_COMM_FAIL_ = 150;
-    const std::string screened_symbols_= ".=-()";
-
 
     std::unordered_map<int64_t, TgBotUser> users_;
 
@@ -177,7 +175,6 @@ private:
     bool save_tg_data_to_file_(const QString& filename) const;
     bool restore_user_data_from_file_();
     bool restore_tg_data_from_file_();
-    void screen_symbols_(std::string& text, const std::string& symbols) const;
 
     std::unique_ptr<TGMessage> parse_message_from_json_(QJsonObject obj);
     std::unique_ptr<TGMessageWaitAnswer> parse_message_wait_answer_from_json_(QJsonObject obj);

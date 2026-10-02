@@ -21,6 +21,21 @@
 #include "tgbot/types/ForceReply.h"
 #include "tgbot/net/CurlHttpClient.h"
 
+
+namespace TGHELPER {
+static const std::string TG_SCREENED_SYMBOLS{"_[]()~+-=|{}.!`>"};
+inline void tg_screen_symbols(std::string& text)
+{
+    for(auto it = text.begin(); it < text.end(); ++it) {
+        if(TG_SCREENED_SYMBOLS.find(*it) != TG_SCREENED_SYMBOLS.npos) {
+            if(it == text.begin() || *(it-1) != '\\') {
+                it = text.insert(it, '\\');
+                ++it;
+            }
+        }
+    }
+}
+}
 using ValueVariant = std::variant<int64_t, double, QString>;
 
 namespace TgBot { class Bot;}
@@ -141,8 +156,6 @@ public:
 protected:
     std::string message_;
     std::vector<TGButtonWCallback*> inline_buttons_;
-    void screen_symbols_(std::string& text, const std::string& symbols) const;
-    const std::string screened_symbols_= ".=-()+";
     void parse_message_();
     void get_tags_ptr_();
     std::list<std::string> message_parts_;
