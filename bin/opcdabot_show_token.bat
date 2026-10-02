@@ -1,1 +1,0 @@
-OPCDATgBot.exe -show-token

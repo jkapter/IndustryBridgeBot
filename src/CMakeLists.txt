@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(OPCDATgBot VERSION 1.4 LANGUAGES CXX)
+project(IndustryBridgeBot VERSION 1.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,9 +53,9 @@ include_directories(
     ${BOOST_ROOT}
 )
 
-set(app_icon_resource_windows "../img/opcdabot.rc")
+set(app_icon_resource_windows "../img/industrybridgebot.rc")
 
-set(OPCDATGBOT_CORE_SOURCES
+set(INDUSTRYBRIDGEBOT_CORE_SOURCES
     logger.h logger.cpp
     datatag.h datatag.cpp
     datatag_opcua.h datatag_opcua.cpp
@@ -69,7 +69,7 @@ set(OPCDATGBOT_CORE_SOURCES
 )
 
 if(WIN32)
-    list(APPEND OPCDATGBOT_CORE_SOURCES
+    list(APPEND INDUSTRYBRIDGEBOT_CORE_SOURCES
         datatag_opcda.h datatag_opcda.cpp
         sourcedrivers/copcclient.h sourcedrivers/copcclient.cpp
         sourcedrivers/opcclientworker.h sourcedrivers/opcclientworker.cpp
@@ -77,16 +77,16 @@ if(WIN32)
     )
 endif()
 
-add_library(OPCDATgBotCore STATIC ${OPCDATGBOT_CORE_SOURCES})
+add_library(IndustryBridgeBotCore STATIC ${INDUSTRYBRIDGEBOT_CORE_SOURCES})
 
-target_link_libraries(OPCDATgBotCore PUBLIC
+target_link_libraries(IndustryBridgeBotCore PUBLIC
     Qt6::Core
     Qt6::OpcUa
     TgBot::TgBot
 )
 
 if(WIN32)
-    target_link_libraries(OPCDATgBotCore PUBLIC
+    target_link_libraries(IndustryBridgeBotCore PUBLIC
 
         ws2_32
         wldap32
@@ -105,7 +105,7 @@ set(PROJECT_SOURCES
         mainwindow.ui
 )
 
-qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
+qt_add_executable(IndustryBridgeBot ${PROJECT_SOURCES}
     res.qrc
     ${app_icon_resource_windows}
     ../styles/styles.qss
@@ -123,8 +123,8 @@ qt_add_executable(OPCDATgBot ${PROJECT_SOURCES}
     tgeventsconfigurationwidget.h tgeventsconfigurationwidget.cpp tgeventsconfigurationwidget.ui
 )
 
-target_link_libraries(OPCDATgBot PRIVATE
-    OPCDATgBotCore
+target_link_libraries(IndustryBridgeBot PRIVATE
+    IndustryBridgeBotCore
     Qt6::Widgets
     Qt6::OpcUa
     TgBot::TgBot
@@ -135,13 +135,13 @@ target_link_libraries(OPCDATgBot PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
-set_target_properties(OPCDATgBot PROPERTIES
+set_target_properties(IndustryBridgeBot PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
 if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-    add_custom_command(TARGET OPCDATgBot POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_SOURCE_DIR}/bin/OPCDATgBot.exe"
-        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:OPCDATgBot>" "${CMAKE_SOURCE_DIR}/bin/"
+    add_custom_command(TARGET IndustryBridgeBot POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_SOURCE_DIR}/bin/IndustryBridgeBot.exe"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:IndustryBridgeBot>" "${CMAKE_SOURCE_DIR}/bin/"
     )
 endif()

@@ -1,8 +1,10 @@
-# OPC DA / OPC UA Telegram Bot
+# IndustryBridgeBot
 
 Настраиваемый Telegram бот (для Windows), который читает и записывает переменные промышленных ПЛК по протоколам **OPC DA 2.0** и **OPC UA** и предоставляет к ним удобный доступ через Telegram.
 
-![](https://github.com/jkapter/OPC_DA_Telegram_bot/blob/main/img/OPC_DA_Telegram_bot_opc_main.png)
+🇬🇧 [English version](README_en.md)
+
+![](https://github.com/jkapter/IndustryBridgeBot/blob/main/img/OPC_DA_Telegram_bot_opc_main.png)
 
 ## Возможности
 
@@ -29,16 +31,17 @@
 - Работа в системном трее, автозапуск опроса OPC и бота при старте приложения.
 - Сохранение конфигурации (тэги, сообщения, команды, кнопки, события, пользователи) в JSON, включая автосохранение при закрытии.
 
-![](https://github.com/jkapter/OPC_DA_Telegram_bot/blob/main/img/OPC_DA_Telegram_bot_messages_example.png)
-![](https://github.com/jkapter/OPC_DA_Telegram_bot/blob/main/img/Screenshot_20260117-142327_Telegram.jpg)
+![](https://github.com/jkapter/IndustryBridgeBot/blob/main/img/OPC_DA_Telegram_bot_messages_example.png)
+![](https://github.com/jkapter/IndustryBridgeBot/blob/main/img/Screenshot_20260117-142327_Telegram.jpg)
 
 ## Как это устроено
 
 - **`src/sourcedrivers/`** — драйверы источников данных: `OPCDADriver`/`COPCClient` (COM/DCOM, классический OPC DA) и `OPCUADriver`/`COPCUAClient` (поверх `Qt6::OpcUa`), объединённые общим интерфейсом `DriverInterface`.
 - **`src/datatag*`, `src/datatagregistry*`** — единая модель тэга (`DataTag` и его специализации `DataTagOpcDA`/`DataTagOpcUA`) и реестр тэгов приложения.
 - **`src/tgobjects/`** — доменная логика Telegram-бота: пользователи и права (`TGParent`, `USER_TYPE`), сценарии (`TGMessage`, `TGMessageWaitAnswer`, `TGTriggerUserCommand`, `TGTriggerTagValue`, `TGScheduledEvent`, `TGButtonWCallback`) и их менеджер `TgBotManager`.
-- **`src/tgbot/`** — библиотека [tgbot-cpp](https://github.com/reo7sp/tgbot-cpp) для работы с Telegram Bot API.
+- **`third_party/tgbot/`** — готовая сборка библиотеки [tgbot-cpp](https://github.com/reo7sp/tgbot-cpp) (динамическая `TgBot.dll`) для работы с Telegram Bot API.
 - **`src/*widget*`, `src/*configurationwidget*`** — Qt Widgets интерфейс конфигурации: обзор и просмотр тэгов, настройка сообщений/команд/кнопок/событий, настройки самого бота.
+- **`src/logger.*`** — запись лога в файл с ротацией по размеру; поддерживает фильтрацию по минимальному уровню (см. раздел "Настройка").
 
 ## Зависимости для сборки
 
@@ -61,4 +64,21 @@ cmake --build build
 
 ## Настройка
 
-Вся конфигурация — источники данных, тэги, сообщения, команды, кнопки, события и права пользователей — выполняется через графический интерфейс приложения; отдельно нужно только один раз указать токен Telegram-бота (параметр запуска `-token=<токен>`).
+Вся конфигурация — источники данных, тэги, сообщения, команды, кнопки, события и права пользователей — выполняется через графический интерфейс приложения.
+
+**Токен Telegram-бота** указывается один раз через параметр запуска и сохраняется в зашифрованном виде в `bin/token.dat`:
+```
+IndustryBridgeBot.exe -token="<токен>"
+IndustryBridgeBot.exe -show-token
+```
+Для этого рядом с исполняемым файлом есть готовые `industrybridgebot_set_token.bat` и `industrybridgebot_show_token.bat`.
+
+**`bin/settings.json`** (необязательный) — дополнительные параметры запуска:
+```json
+{
+  "start_application_on_tray": true,
+  "log_level": "Warning"
+}
+```
+- `start_application_on_tray` — запуск сразу свёрнутым в системный трей.
+- `log_level` — минимальный уровень логирования (`Debug`/`Info`/`Warning`/`Critical`/`Fatal`). Если указан, в лог попадают только сообщения самого приложения не ниже этого уровня (сторонний шум, например диагностика плагина OPC UA, отфильтровывается). Если не указан (или значение не распознано, например `None`) — в лог попадает всё, как раньше.

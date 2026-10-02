@@ -1,0 +1,1 @@
+IndustryBridgeBot.exe -show-token
