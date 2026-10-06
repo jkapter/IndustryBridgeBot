@@ -32,6 +32,12 @@ QVariant DataTagOpcUA::GetOPCVariantToWrite()
 
     if(value_to_write_.isValid()) {
         QVariant ret_val = value_to_write_;
+
+        double gain = (gain_value_.has_value() && gain_value_.value() != 0.0) ? gain_value_.value() : 1.0;
+        if(gain != 1.0 && ret_val.canConvert<double>()) {
+            ret_val = ret_val.toDouble() / gain;
+        }
+
         QMetaType ua_meta_type = ua_type_to_meta_type_(ua_data_type_);
         if(!ua_meta_type.isValid()
             || !ret_val.canConvert(ua_meta_type)

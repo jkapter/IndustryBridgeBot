@@ -187,6 +187,15 @@ QString DataTag::GetStringValue(bool use_substitute_values)
 ValueVariant DataTag::GetValue(bool use_substitute_values)
 {
     if(ValueIsBool()) return static_cast<int64_t>(value_.toBool());
+
+    double gain = GetGainOption().value_or(1.0);
+    if(gain != 1.0) {
+        if(ValueIsInteger())         return static_cast<double>(value_.toLongLong()) * gain;
+        if(ValueIsUnsignedInteger()) return static_cast<double>(value_.toULongLong()) * gain;
+        if(ValueIsReal())            return value_.toDouble() * gain;
+        return GetStringValue(use_substitute_values);
+    }
+
     if(ValueIsInteger()) return static_cast<int64_t>(value_.toLongLong());
     if(ValueIsUnsignedInteger()) return value_.toLongLong() < std::numeric_limits<int64_t>::max() ? static_cast<int64_t>(value_.toLongLong()) : std::numeric_limits<int64_t>::max();
     if(ValueIsReal()) return value_.toDouble();

@@ -46,7 +46,7 @@
 ## Зависимости для сборки
 
 - Qt 6 (модули `Widgets`, `OpcUa`) — сборка велась и тестировалась на Qt 6.10.
-- [OPC Core Components](https://opcfoundation.org/developer-tools/samples-and-tools-classic/core-components/) — заголовки классического OPC DA (`OPC_Foundation/Include`).
+- [OPC Core Components](https://opcfoundation.org/developer-tools/samples-and-tools-classic/core-components/) — заголовки OPC DA (`OPC_Foundation/Include`).
 - OpenSSL, libcurl, zlib — используются `tgbot-cpp` для работы с Telegram Bot API (пути ожидаются в `third_party/openssl`, `third_party/curl`, `third_party/zlib`).
 - Boost — заголовочные зависимости `tgbot-cpp` (asio).
 - Компилятор с поддержкой C++20 (сборка проверялась на MinGW из комплекта Qt).
@@ -81,4 +81,4 @@ IndustryBridgeBot.exe -show-token
 }
 ```
 - `start_application_on_tray` — запуск сразу свёрнутым в системный трей.
-- `log_level` — минимальный уровень логирования (`Debug`/`Info`/`Warning`/`Critical`/`Fatal`). Если указан, в лог попадают только сообщения самого приложения не ниже этого уровня (сторонний шум, например диагностика плагина OPC UA, отфильтровывается). Если не указан (или значение не распознано, например `None`) — в лог попадает всё, как раньше.
+- `log_level` — минимальный уровень логирования (`None`/`Debug`/`Info`/`Warning`/`Critical`/`Fatal`).

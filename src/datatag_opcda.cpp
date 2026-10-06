@@ -79,26 +79,26 @@ std::optional<VARIANT> DataTagOpcDA::GetOPCVariantToWrite()
     if(!value_to_write_.isValid()) return std::nullopt;
     VARIANT ret_var;
     ret_var.vt = opc_legacy_type_;
-    double gain = gain_value_.has_value() ? gain_value_.value() : 1.0;
+    double gain = (gain_value_.has_value() && gain_value_.value() != 0.0) ? gain_value_.value() : 1.0;
     switch(ret_var.vt) {
-    case VT_I2: ret_var.iVal = static_cast<SHORT>(value_.toInt()); break;
-    case VT_I4: ret_var.lVal = static_cast<LONG>(value_.toInt()); break;
-    case VT_I1: ret_var.bVal = static_cast<SHORT>(value_.toInt()); break;
-    case VT_I8: ret_var.llVal = static_cast<LONGLONG>(value_.toInt()); break;
-    case VT_INT: ret_var.intVal = static_cast<INT>(value_.toInt()); break;
-    case VT_R4: ret_var.fltVal = static_cast<FLOAT>(value_.toDouble() / gain); break;
-    case VT_R8: ret_var.dblVal = static_cast<DOUBLE>(value_.toDouble() / gain); break;
-    case VT_UI2: ret_var.uiVal = static_cast<USHORT>(value_.toUInt()); break;
-    case VT_UI4: ret_var.ulVal = static_cast<ULONG>(value_.toUInt()); break;
-    case VT_UI1: ret_var.uiVal = static_cast<USHORT>(value_.toUInt()); break;
-    case VT_UI8: ret_var.ullVal = static_cast<ULONGLONG>(value_.toUInt()); break;
-    case VT_UINT: ret_var.uintVal = static_cast<UINT>(value_.toUInt()); break;
+    case VT_I2:  ret_var.iVal    = static_cast<SHORT>(value_to_write_.toDouble() / gain); break;
+    case VT_I4:  ret_var.lVal    = static_cast<LONG>(value_to_write_.toDouble() / gain); break;
+    case VT_I1:  ret_var.bVal    = static_cast<SHORT>(value_to_write_.toDouble() / gain); break;
+    case VT_I8:  ret_var.llVal   = static_cast<LONGLONG>(value_to_write_.toDouble() / gain); break;
+    case VT_INT: ret_var.intVal  = static_cast<INT>(value_to_write_.toDouble() / gain); break;
+    case VT_R4:  ret_var.fltVal  = static_cast<FLOAT>(value_to_write_.toDouble() / gain); break;
+    case VT_R8:  ret_var.dblVal  = static_cast<DOUBLE>(value_to_write_.toDouble() / gain); break;
+    case VT_UI2: ret_var.uiVal   = static_cast<USHORT>(value_to_write_.toDouble() / gain); break;
+    case VT_UI4: ret_var.ulVal   = static_cast<ULONG>(value_to_write_.toDouble() / gain); break;
+    case VT_UI1: ret_var.uiVal   = static_cast<USHORT>(value_to_write_.toDouble() / gain); break;
+    case VT_UI8: ret_var.ullVal  = static_cast<ULONGLONG>(value_to_write_.toDouble() / gain); break;
+    case VT_UINT:ret_var.uintVal = static_cast<UINT>(value_to_write_.toDouble() / gain); break;
     case VT_BSTR: {
-        buffer_string_ = value_.toString().toStdWString();
+        buffer_string_ = value_to_write_.toString().toStdWString();
         ret_var.bstrVal = const_cast<wchar_t*>(buffer_string_.c_str());
         break;
     }
-    case VT_BOOL: ret_var.boolVal = value_.toBool() ? VARIANT_TRUE : VARIANT_FALSE; break;
+    case VT_BOOL: ret_var.boolVal = value_to_write_.toBool() ? VARIANT_TRUE : VARIANT_FALSE; break;
     default : return std::nullopt;
     }
     return ret_var;
